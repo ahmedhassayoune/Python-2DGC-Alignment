@@ -393,4 +393,32 @@ def add_nist_info_in_mgf_file(filename, output_filename='lib_EIB_gt.mgf'):
         intensity_values_list.append(spectrum.intensity_list)
     write_masspec.mass_spectra_to_mgf(output_filename, mass_values_list, intensity_values_list, meta_list = None, filter_by_instrument_type = None, names=names, casnos=casnos, hmdb_ids=hmdb_ids)
 
+def generate_lib_scores_from_lib(lib_filename, output_path='./lib_scores.json'):
+    r"""Read the input mgf library and compute pairwise similarity
+
+    Parameters
+    ----------
+    lib_filename :
+        Path to HMDB spectra library file
+    output_filename : optional
+        New library filename
+    ----------
+    -------
+    Examples
+    --------
+    >>> import utils
+    >>> utils.generate_lib_scores_from_lib('lib_filename', 'output_filename')
+    """
+    # disable matchms logger
+    logger=logging.getLogger('matchms')
+    logger.setLevel('ERROR')
+
+    spectra = list(load_from_mgf(lib_filename))[:100]
+    scores = calculate_scores(references=spectra,
+                            queries=spectra,
+                            similarity_function=CosineGreedy(),
+                            is_symmetric=False, array_type="numpy")
+    scores.to_json(output_path)
+
+
 #add_formula_in_aligned_peak_table('C:/Users/Stan/pic/COVID-2020-2021/aligned_peak_table.csv', 'C:/Users/Stan/pic/COVID-2020-2021/peak_table.csv')
