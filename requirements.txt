@@ -1,0 +1,17 @@
+molmass
+NistChemPy
+numpy
+pandas
+matchms
+pyms-nist-search
+PyMassSpec
+scikit-image
+scipy
+netCDF4
+PyWavelets
+matplotlib
+scikit-learn
+plotly
+seaborn
+opencv-python
+pybaselines
