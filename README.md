@@ -58,10 +58,13 @@
 
 Python package to process GCxGC-MS data.
 
-* processing and annotation of chromatograms
-* peak tables alignment and chromatogram alignment using R package
-* machine learning and statistical analysis for the automatic detection of biomarkers
+* Processing and annotation of chromatograms
+* Chromatogram visualization
+* Peak tables alignment and chromatogram alignment using R package
+* Machine learning and statistical analysis for the automatic detection of biomarkers
+* Pixel discriminant approach for the automatic detection of biomarkers
 * GCxGC-MS data simulation
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -98,6 +101,7 @@ This is an example of how to use the package.
    ```sh
    pip install -r requirements.txt
    ```
+3. R package for alignment R2DGC and RGCxGC.
 #### If you need to simulate data
 1. Generate lib scores
     ```sh
