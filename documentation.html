@@ -1,0 +1,390 @@
+<html><head><style>body {
+   color: black;
+}
+</style></head><body><style>
+.bg_color {
+    background-color: aliceblue;
+    border-radius: 3px;
+    font-size: 85%;
+    line-height: 1.45;
+    overflow: auto;
+    padding: 16px;
+}
+</style>
+
+
+<h1 id="help-on-module-identification-">Help on module identification:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>identification(filename, method='persistent_homology', mode='tic', seuil=5, hit_prob_min=15, ABS_THRESHOLDS=None, cluster=True, min_distance=1, sigma_ratio=1.6, num_sigma=10, formated_spectra=True, match_factor_min=700)</div>
+        Takes a chromatogram as file and returns identified compounds.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">cohort_identification</span><span class="hljs-params">(path)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">cohort_identification_alignment_input_format_txt</span><span class="hljs-params">(filename, matches_identification, PATH=<span class="hljs-string">'./COVID-2020-2021/'</span>)</span></span>
+    Generate formatted peak <span class="hljs-selector-tag">table</span> <span class="hljs-keyword">for</span> alignment.
+
+<span class="hljs-function"><span class="hljs-title">cohort_identification_to_csv</span><span class="hljs-params">(filename, matches_identification, PATH=<span class="hljs-string">'./COVID-2020-2021/'</span>)</span></span>
+    Generate csv (readable) peak <span class="hljs-selector-tag">table</span>.
+
+<span class="hljs-function"><span class="hljs-title">compute_matches_identification</span><span class="hljs-params">(matches, chromato, chromato_cube, mass_range, similarity_threshold=<span class="hljs-number">0.001</span>, formated_spectra=False)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">mass_spectra_format</span><span class="hljs-params">(mass_range, int_values)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_process_input_and_launch_sample_identification</span><span class="hljs-params">()</span></span>
+    Read chromatogram and generate peak <span class="hljs-selector-tag">table</span>. Executed <span class="hljs-keyword">in</span> subprocess to avoid memory leaks due to NIST search.
+
+
+<span class="hljs-function"><span class="hljs-title">sample_identification</span><span class="hljs-params">(path, file, OUTPUT_PATH=None)</span></span>
+    Read sample chromatogram and generate associated peak <span class="hljs-selector-tag">table</span>.
+
+<span class="hljs-function"><span class="hljs-title">takeSecond</span><span class="hljs-params">(elem)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">write_line</span><span class="hljs-params">(compound_name, rt1, rt2, area, formatted_spectrum)</span></span>
+</code></pre><h1 id="help-on-module-read_chroma-">Help on module read_chroma:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>read_chroma(filename, mod_time=1.25, max_val=None)</div>
+        Read chromatogram file.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>read_chromato_and_chromato_cube(filename, mod_time=1.25, pre_process=True)</div>
+        Same as read_chromato_cube but do not returns full spectra_obj (only range_min and range_max) because of RAM issue.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>read_chromato_cube(filename, mod_time=1.25, pre_process=True)</div>
+        Read chromatogram file and compute TIC chromatogram, 3D chromatogram and noise std.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">full_spectra_to_chromato_cube</span><span class="hljs-params">(full_spectra, spectra_obj, mass_range_min=None, mass_range_max=None)</span></span>
+    Compute <span class="hljs-number">3</span>D chromatogram from mass spectra. Then it is possible to read specific mass spectrum from this <span class="hljs-number">3</span>D chromatogram or detect peaks <span class="hljs-keyword">in</span> <span class="hljs-number">3</span>D.
+
+<span class="hljs-function"><span class="hljs-title">centroided_to_mass_nominal_chromatogram</span><span class="hljs-params">(filename, cdf_name, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+    Read centroided chromatogram, convert and save it as nominal mass chromatogramm cdf file.
+
+<span class="hljs-function"><span class="hljs-title">full_spectra_to_chromato_cube_centroid</span><span class="hljs-params">(full_spectra, spectra_obj, mass_range_min=None, mass_range_max=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">full_spectra_to_chromato_cube_from_centroid</span><span class="hljs-params">(full_spectra, spectra_obj, mass_range_min=None, mass_range_max=None)</span></span>
+    Compute <span class="hljs-number">3</span>D chromatogram from centroided mass spectra to handle centroided <span class="hljs-selector-tag">details</span>.
+
+<span class="hljs-function"><span class="hljs-title">print_chroma_header</span><span class="hljs-params">(filename)</span></span>
+    Print chromato <span class="hljs-selector-tag">header</span>.
+
+<span class="hljs-function"><span class="hljs-title">read_chroma_spectra_loc</span><span class="hljs-params">(filename, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+    Read chromatogram file.
+
+<span class="hljs-function"><span class="hljs-title">read_only_chroma</span><span class="hljs-params">(filename, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+    Read chromatogram file.
+
+<span class="hljs-function"><span class="hljs-title">chromato_cube</span><span class="hljs-params">(spectra_obj, mass_range_min=None, mass_range_max=None, debuts=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">chromato_part</span><span class="hljs-params">(chromato_obj, rt1, rt2, mod_time=<span class="hljs-number">1.25</span>, rt1_window=<span class="hljs-number">5</span>, rt2_window=<span class="hljs-number">0.1</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_chromato_mass</span><span class="hljs-params">(spectra_obj, tm, debuts=None)</span></span>
+</code></pre><h1 id="help-on-module-plot-">Help on module plot:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>visualizer(chromato_obj, mod_time=1.25, rt1=None, rt2=None, rt1_window=5, rt2_window=0.1, plotly=False, title='', points=None, radius=None, pt_shape='.', log_chromato=True, casnos_dict=None, contour=[], center_pt=None, center_pt_window_1=None, center_pt_window_2=None, save=False)</div>
+        Plot chromatogram
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>plot_mass(mass_values, int_values, title='', top_n_mass=10, figsize=(32, 18))</div>
+        Plot mass spectrum
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>plot_3d_chromato(chromato, rstride=10, cstride=10, plot_map=True)</div></code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">mass_overlay</span><span class="hljs-params">(mass_values_list, intensity_values_list, title=<span class="hljs-string">'mass_overlay'</span>, top_n_mass=<span class="hljs-number">10</span>, figsize=(<span class="hljs-number">32</span>, <span class="hljs-number">18</span>)</span></span>)
+    Plot multiple mass spectra
+
+<span class="hljs-function"><span class="hljs-title">get_cmap</span><span class="hljs-params">(n, name=<span class="hljs-string">'hsv'</span>)</span></span>
+    Returns <span class="hljs-selector-tag">a</span> function that maps each index <span class="hljs-keyword">in</span> <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, ..., n-<span class="hljs-number">1</span> to <span class="hljs-selector-tag">a</span> distinct 
+    RGB <span class="hljs-attribute">color</span>; the keyword argument name must be <span class="hljs-selector-tag">a</span> standard mpl colormap name.
+
+<span class="hljs-function"><span class="hljs-title">plot_acp</span><span class="hljs-params">(features_disc_mol_new_cd, labels, projection=None, figsize=(<span class="hljs-number">10</span>, <span class="hljs-number">5</span>)</span></span>)
+    Plot ACP
+
+<span class="hljs-function"><span class="hljs-title">plot_confusion_matrix</span><span class="hljs-params">(conf_mat)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">plot_corr_matrix</span><span class="hljs-params">(corr_matrix)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">plot_feature_and_permutation_importance</span><span class="hljs-params">(feature_importance, permutation_importance, mol_list, id_max=<span class="hljs-number">10</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">plot_feature_corr</span><span class="hljs-params">(index, corr_matrix, mol_list, id_max=<span class="hljs-number">20</span>)</span></span>
+    Plot the correlation of <span class="hljs-selector-tag">a</span> feature with all other feature
+
+<span class="hljs-function"><span class="hljs-title">plot_feature_importance</span><span class="hljs-params">(feature_importance, mol_list, id_max=<span class="hljs-number">10</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">plot_hmdb_id_spectra</span><span class="hljs-params">(path, hmdb_id)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">plot_scores_array</span><span class="hljs-params">(scores_array, similarity_measure)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">point_is_visible</span><span class="hljs-params">(point, indexes)</span></span>
+</code></pre><h1 id="help-on-module-mass_spec-">Help on module mass_spec:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>read_full_spectra_centroid(spectra_obj, max_val=None)</div>
+        Build nominal mass mass spectra from centroided mass and intensity values.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">centroid</span><span class="hljs-params">(spectra_obj, mv_index, mass_values, int_values)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">centroid_to_full_nominal</span><span class="hljs-params">(spectra_obj, mass_values, int_values)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">compute_chromato_mass_from_spectra_loc</span><span class="hljs-params">(loc, mass_range, mass)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">filter_spectra</span><span class="hljs-params">(file)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">hmdb_txt_to_mgf</span><span class="hljs-params">(path, libname=<span class="hljs-string">'./hmdb_lib.mgf'</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">peak_retrieval</span><span class="hljs-params">(spectrums, spectrums_lib, coordinates_in_chromato, min_score=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">peak_retrieval_from_path</span><span class="hljs-params">(spectrum_path, lib_path, coordinates_in_chromato=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">peak_retrieval_kernel</span><span class="hljs-params">(spectra, spectrums_lib, similarity_measure)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">peak_retrieval_multiprocessing</span><span class="hljs-params">(spectrums, spectrums_lib, coordinates_in_chromato, min_score=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_full_spectra</span><span class="hljs-params">(spectra_obj, max_val=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_full_spectra_full_centroid</span><span class="hljs-params">(spectra_obj, max_val=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_hmdb_spectrum</span><span class="hljs-params">(filename)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_spectra</span><span class="hljs-params">(spectra_obj, max_val=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_spectra_centroid</span><span class="hljs-params">(spectra_obj, max_val=None)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_spectrum</span><span class="hljs-params">(chromato, pic_coord, spectra)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_spectrum_from_chromato_cube</span><span class="hljs-params">(pic_coord, chromato_cube)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_spectrum_tr_coord</span><span class="hljs-params">(chromato, pic_coord, spectra, time_rn, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">spectra_matching</span><span class="hljs-params">(spectrums, spectrums_lib, similarity_measure=&lt;matchms.similarity.CosineGreedy.CosineGreedy object at <span class="hljs-number">0</span>x0000016F61063AF0&gt;)</span></span>
+</code></pre><h1 id="help-on-module-baseline_correction-">Help on module baseline_correction:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>chromato_cube_corrected_baseline(chromato_cube)</div>
+    Apply baseline correction on each chromato of the input.
+
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>chromato_no_baseline(chromato, j=None)</div>
+        Correct baseline and apply savgol filter.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">baseline_als</span><span class="hljs-params">(y, lam, p, niter=<span class="hljs-number">10</span>)</span></span>
+</code></pre><h1 id="help-on-module-discriminant_pixel-">Help on module discriminant_pixel:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>find_discriminant_compounds(chromato_ref_obj, aligned_chromatos, chromato_cube, vij, disp=False, max_pixel=500, local_max_filter=False, mod_time=1.25, title='', hit_prob_min=15, match_factor_min=800)</div>
+        Finds discriminant compounds (finds discriminant pixels and identifies them).
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>find_discriminant_pixels(chromato_ref_obj, aligned_chromatos, vij, disp=False, max_pixel=500, local_max_filter=False, title='')</div>
+        Find discriminant pixels.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">read_aligned_chromato</span><span class="hljs-params">(filename)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">read_aligned_chromatos</span><span class="hljs-params">(CORRECTED_CHROMA_PATH)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">compute_map</span><span class="hljs-params">(chromatos, vij)</span></span>
+</code></pre><h1 id="help-on-module-integration-">Help on module integration:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>peak_pool_similarity_check(chromato, coordinates, coordinate, chromato_cube, threshold=0.25, similarity_threshold=0.01, plot_labels=False)</div>
+        Peak integration. Find pixels in the neighborhood of the peak passed in parameter which belong to the peak blob. It is usefull to determine the area of the peak.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>peak_pool_similarity_check_coordinates(chromato, coordinates, coordinate, chromato_cube, threshold=0.25, similarity_threshold=0.01, plot_labels=False)</div>
+        Peak integration. Find pixels in the neighborhood of the peak passed in parameter which belong to the peak blob. It is usefull to determine the area of the peak.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">compute_area</span><span class="hljs-params">(chromato, blob)</span></span>
+    Compute area of <span class="hljs-selector-tag">a</span> blob.
+
+<span class="hljs-function"><span class="hljs-title">estimate_num_components</span><span class="hljs-params">(X, max_components=<span class="hljs-number">3</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">estimate_num_components_aic</span><span class="hljs-params">(X, max_components=<span class="hljs-number">3</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">estimate_num_components_with_spectra_dist</span><span class="hljs-params">(X, chromato_cube, mass_values, max_components=<span class="hljs-number">3</span>, threshold=<span class="hljs-number">0.9</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">estimate_peaks_center_aic</span><span class="hljs-params">(cds, num_components=None, max_components=<span class="hljs-number">3</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">estimate_peaks_center_bic</span><span class="hljs-params">(cds, num_components=None, max_components=<span class="hljs-number">3</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">estimate_peaks_center_with_dist</span><span class="hljs-params">(cds, chromato_cube, mass_values, num_components=None, threshold=<span class="hljs-number">0.9</span>, max_components=<span class="hljs-number">3</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_all_area</span><span class="hljs-params">(chromato, coordinates, threshold=<span class="hljs-number">0.25</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_all_contour</span><span class="hljs-params">(blobs)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_contour</span><span class="hljs-params">(blob, chromato, time_rn)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">peak_pool</span><span class="hljs-params">(chromato, coordinates, coordinate, threshold=<span class="hljs-number">0.25</span>, plot_labels=False)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">similarity_cluestering</span><span class="hljs-params">(chromato_cube, coordinates, ref_point, similarity_threshold=<span class="hljs-number">0.01</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">tmp</span><span class="hljs-params">(chromato, coordinates, coordinate, threshold=<span class="hljs-number">0.25</span>)</span></span>
+</code></pre><h1 id="help-on-module-matching-">Help on module matching:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>matching_nist_lib_from_chromato_cube(chromato_obj, chromato_cube, coordinates, mod_time=1.25, hit_prob_min=15, match_factor_min=800)</div>
+        Indentify retrieved peaks using NIST library.
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">matching_nist_lib</span><span class="hljs-params">(chromato_obj, spectra, coordinates, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">check_match</span><span class="hljs-params">(match)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">compute_metrics</span><span class="hljs-params">(coordinates, chromato_obj, spectra, spectrum_path, spectrum_lib, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">compute_metrics_from_chromato_cube</span><span class="hljs-params">(coordinates, chromato_obj, chromato_cube, spectrum_path, spectrum_lib, mod_time=<span class="hljs-number">1.25</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">matching</span><span class="hljs-params">(chromato_obj, spectra, spectrum_path, spectrum_lib, coordinates, mod_time=<span class="hljs-number">1.25</span>, min_score=None)</span></span>
+</code></pre><h1 id="help-on-module-peak_simulation-">Help on module peak_simulation:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>simulation_from_cdf_model(lib_path='./lib_EIB.mgf', scores_path='./lib_scores.json', min_similarity=0.0, max_similarity=1.1, min_overlap=0.7, max_overlap=0.99, intensity_range_min=20000, intensity_range_max=40000, model_filename='./data/ELO_CDF/model.cdf', nb_chromato=1, mod_time=1.25, new_cdf_path='./data/ELO_CDF/', cdf_name='new_cdf', noise_loc=1000.0, noise_scale=500.0, poisson_rep=0.9)</div>
+        Creates a new chromatogram with overlapped clusters based on a model chromatogram and saves it as cdf file.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>create_chromato_cube_with_overlapped_cluster(shape, lib_spectra, array_scores, min_overlap=0.7, max_overlap=0.99, min_similarity=0.0, max_similarity=1.1, add_noise=True, intensity_range_min=20000, intensity_range_max=40000, noise_loc=1000.0, noise_scale=500.0, poisson_rep=0.9)</div>
+        Create a 3D chromatogram with overlapped clusters
+</code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">add_noise</span><span class="hljs-params">(noise_typ, image)</span></span>
+    Print chromato <span class="hljs-selector-tag">header</span>.
+
+<span class="hljs-function"><span class="hljs-title">add_noise_3D</span><span class="hljs-params">(image, noise_typ=<span class="hljs-string">'custom_gauss'</span>, noise_loc=<span class="hljs-number">1000.0</span>, noise_scale=<span class="hljs-number">500.0</span>, poisson_rep=<span class="hljs-number">0.9</span>)</span></span>
+    Add noise <span class="hljs-keyword">in</span> <span class="hljs-number">3</span>D chromatogram
+
+<span class="hljs-function"><span class="hljs-title">add_peak</span><span class="hljs-params">(chromato, peak, mu)</span></span>
+    Take <span class="hljs-selector-tag">a</span> chromatogram and <span class="hljs-selector-tag">a</span> peak and add the peak at the location mu <span class="hljs-keyword">in</span> the TIC chromatogram.
+
+<span class="hljs-function"><span class="hljs-title">add_peak_and_spectrum</span><span class="hljs-params">(chromato, chromato_cube, peak, mu)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">asym_gauss_kernel</span><span class="hljs-params">(size: int, sizey: int = None, sigma=<span class="hljs-number">1.0</span>)</span></span> -&gt; &lt;built-<span class="hljs-keyword">in</span> function array&gt;
+    Returns <span class="hljs-selector-tag">a</span> <span class="hljs-number">2</span>D asymetric Gaussian kernel.
+
+<span class="hljs-function"><span class="hljs-title">create_and_add_peak</span><span class="hljs-params">(chromato, size, intensity, mu, sigma=<span class="hljs-number">1.0</span>)</span></span>
+    Take <span class="hljs-selector-tag">a</span> chromatogram, create <span class="hljs-selector-tag">a</span> peak and add the peak at the location mu <span class="hljs-keyword">in</span> the TIC chromatogram.
+
+<span class="hljs-function"><span class="hljs-title">create_overlapped_cluster_in_cube</span><span class="hljs-params">(mu0, min_overlap=<span class="hljs-number">0.7</span>, max_overlap=<span class="hljs-number">0.99</span>)</span></span>
+    Create overlapped cluster.
+
+<span class="hljs-function"><span class="hljs-title">create_peak</span><span class="hljs-params">(size, intensity, sigma=<span class="hljs-number">1.0</span>, random_noise=False)</span></span>
+    Returns <span class="hljs-selector-tag">a</span> peak (guassien kernel multiply by intensity).
+
+<span class="hljs-function"><span class="hljs-title">create_random_blob</span><span class="hljs-params">(mu_x, mu_y, mu_x_range=<span class="hljs-number">0</span>, mu_y_range=<span class="hljs-number">0</span>, sigma_x_range_min=<span class="hljs-number">0.5</span>, sigma_x_range_max=<span class="hljs-number">5</span>, sigma_y_range_min=<span class="hljs-number">0.5</span>, sigma_y_range_max=<span class="hljs-number">5</span>)</span></span>
+    Create random blob.
+
+<span class="hljs-function"><span class="hljs-title">add_chromato_cube_gaussian_white_noise</span><span class="hljs-params">(chromato_cube, noise_typ=<span class="hljs-string">'gauss'</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">create_and_add_peak_spectrum</span><span class="hljs-params">(chromato_cube, size, intensity, mu, spectrum, sigma=<span class="hljs-number">1.0</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">create_chromato_cube</span><span class="hljs-params">(chromato_shape, nb_peaks, mu_center=[], center_dist=<span class="hljs-number">3</span>, size=<span class="hljs-number">80</span>, min_similarity=<span class="hljs-number">0.0</span>, max_similarity=<span class="hljs-number">1.1</span>, lib_path=<span class="hljs-string">'./lib_EIB.mgf'</span>, scores_path=<span class="hljs-string">'./lib_scores.json'</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">create_chromato_with_overlapped_cluster</span><span class="hljs-params">(shape, min_overlap=<span class="hljs-number">0.7</span>, max_overlap=<span class="hljs-number">0.99</span>, sigma_x_range_min=<span class="hljs-number">2</span>, sigma_x_range_max=<span class="hljs-number">5</span>, sigma_y_range_min=<span class="hljs-number">2</span>, sigma_y_range_max=<span class="hljs-number">5</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">create_overlapped_cluster</span><span class="hljs-params">(chrom, mu0, sigma_x_range_min=<span class="hljs-number">2</span>, sigma_x_range_max=<span class="hljs-number">5</span>, sigma_y_range_min=<span class="hljs-number">2</span>, sigma_y_range_max=<span class="hljs-number">5</span>, size=<span class="hljs-number">40</span>, min_overlap=<span class="hljs-number">0.7</span>, max_overlap=<span class="hljs-number">0.99</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">create_random_mass_spectra</span><span class="hljs-params">(nb)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">delete_peak</span><span class="hljs-params">(chromato_cube, size, intensity, mu, spectrum, sigma=<span class="hljs-number">1.0</span>)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">gauss_kernel</span><span class="hljs-params">(size: int, sizey: int = None, sigma=<span class="hljs-number">1.0</span>)</span></span> -&gt; &lt;built-<span class="hljs-keyword">in</span> function array&gt;
+    Returns <span class="hljs-selector-tag">a</span> <span class="hljs-number">2</span>D Gaussian kernel.
+
+<span class="hljs-function"><span class="hljs-title">get_similar_spectrum</span><span class="hljs-params">(spectrum_index, array_scores, min_similarity=<span class="hljs-number">0.0</span>, max_similariy=<span class="hljs-number">1.1</span>)</span></span>
+</code></pre><h1 id="help-on-module-peak_table_alignment-">Help on module peak_table_alignment:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>peak_table_alignment()</div>
+        Peak table based alignment.
+</code></pre>
+
+<h1 id="help-on-module-pixel_alignment-">Help on module pixel_alignment:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>pixel_alignment(PATH='F:/Bureau/032023-data-Tenax-VOC-COVID/')</div>
+        Pixel based chromatogram alignment.
+</code></pre>
+
+<h1 id="help-on-module-utils-">Help on module utils:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>compute_spectra_similarity(spectrum1, spectrum2)</div>
+        Compute similarity between two spectra. First spectrum and second spectrum must have the same dimensions.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>get_two_points_and_compute_spectra_similarity(pt1, pt2, spectra_obj, chromato_cube)</div>
+        Get two points and compute spectra similarity.
+</code></pre>
+
+<pre class="bg_color"><code><div style="color: red; font-weight: bold;";>retrieve_formula_and_mass_from_compound_name(compound_name)</div></code></pre>
+
+<pre><code><span class="hljs-function"><span class="hljs-title">add_formula_in_aligned_peak_table</span><span class="hljs-params">(filename, output_filename)</span></span>
+    Retrieve and add formula <span class="hljs-keyword">in</span> aligned peak <span class="hljs-selector-tag">table</span> <span class="hljs-keyword">for</span> each molecule. 
+
+<span class="hljs-function"><span class="hljs-title">add_formula_weight_in_aligned_peak_table_from_molecule_name_formula_dict</span><span class="hljs-params">(filename, output_filename, molecule_name_formula_dict)</span></span>
+    Add formula weight <span class="hljs-keyword">in</span> aligned peak <span class="hljs-selector-tag">table</span> from molecule name/formula dict
+
+<span class="hljs-function"><span class="hljs-title">add_nist_info_in_mgf_file</span><span class="hljs-params">(filename, output_filename=<span class="hljs-string">'lib_EIB_gt.mgf'</span>)</span></span>
+    Retrieve NIST infos of spectra <span class="hljs-keyword">in</span> HMDB library file (MGF format) and create <span class="hljs-selector-tag">a</span> new library (MGF format) with retrieved NIST informations.
+
+<span class="hljs-function"><span class="hljs-title">build_molecule_name_formula_dict_from_peak_tables</span><span class="hljs-params">(PATH)</span></span>
+    Take aligned peak <span class="hljs-selector-tag">table</span> and create <span class="hljs-selector-tag">a</span> dictionary which associate formula and nominal mass to each molecule <span class="hljs-keyword">in</span> the peak <span class="hljs-selector-tag">table</span>
+
+<span class="hljs-function"><span class="hljs-title">compute_spectrum_mass_values</span><span class="hljs-params">(spectra_obj)</span></span>
+    Compute nominal mass format mass values from spectra infos. NEED REFACTO
+
+<span class="hljs-function"><span class="hljs-title">formula_to_nominal_mass</span><span class="hljs-params">(formula)</span></span>
+    Retrieve and add formula <span class="hljs-keyword">in</span> aligned peak <span class="hljs-selector-tag">table</span> <span class="hljs-keyword">for</span> each molecule.
+
+<span class="hljs-function"><span class="hljs-title">retrieved_nist_casnos_from_hmbd_spectra</span><span class="hljs-params">(lib_path)</span></span>
+    NIST Search with HMDB spectra to retrieve NIST infos (casnos...).
+
+<span class="hljs-function"><span class="hljs-title">shuffle_dict</span><span class="hljs-params">(d)</span></span>
+    Shuffle dictionary
+
+<span class="hljs-function"><span class="hljs-title">get_name_dict</span><span class="hljs-params">(matches)</span></span>
+    Group coordinates <span class="hljs-keyword">in</span> matches by compound name
+
+<span class="hljs-function"><span class="hljs-title">colors</span><span class="hljs-params">(coordinates, matches)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_casno_dict</span><span class="hljs-params">(matches)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_casno_list</span><span class="hljs-params">(matches)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">get_name_list</span><span class="hljs-params">(matches)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">retrieve_mol_list_formula_weight</span><span class="hljs-params">(mol_list, mol_list_formla_weight_dict)</span></span>
+
+<span class="hljs-function"><span class="hljs-title">unique_mol_list_formla_weight_dict</span><span class="hljs-params">(mol_list)</span></span>
+</code></pre><h1 id="help-on-module-projection-">Help on module projection:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre><code>chromato_to_matrix(<span class="hljs-built_in">points</span>, time_rn, mod_time, chromato_dim)
+    Project <span class="hljs-built_in">points</span> from chromatogram (<span class="hljs-keyword">in</span> <span class="hljs-built_in">time</span>) into <span class="hljs-built_in">matrix</span> chromatogram (ndarray).
+
+matrix_to_chromato(<span class="hljs-built_in">points</span>, time_rn, mod_time, chromato_dim)
+    Project <span class="hljs-built_in">points</span> from chromatogram <span class="hljs-built_in">matrix</span> (ndarray) into chromatogram (<span class="hljs-keyword">in</span> <span class="hljs-built_in">time</span>).
+</code></pre><h1 id="help-on-module-peaks_shape-">Help on module peaks_shape:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre><code>calculate_moment(img, <span class="hljs-built_in">width</span>, <span class="hljs-built_in">height</span>, p, q) -&gt; int
+    Renvoie le moment d'ordre (p + q) de l'<span class="hljs-built_in">image</span> f de taille (<span class="hljs-built_in">width</span> * <span class="hljs-built_in">height</span>).
+
+<span class="hljs-built_in">central_moment</span>(img, <span class="hljs-built_in">width</span>, <span class="hljs-built_in">height</span>, p, q) -&gt; int
+    Renvoie le moment central d'ordre (p + q) de l'<span class="hljs-built_in">image</span> f de taille (<span class="hljs-built_in">width</span> * <span class="hljs-built_in">height</span>) centrÚ sur le centre de gravitÚ de l'<span class="hljs-built_in">image</span>.
+    Le moment central est insensible aux translations.
+
+centre_of_gravity(img, <span class="hljs-built_in">width</span>, <span class="hljs-built_in">height</span>)
+    Renvoie les coordonnÚes du centre de gravitÚ (x, y) de la forme de l'<span class="hljs-built_in">image</span> f de taille (<span class="hljs-built_in">width</span> * <span class="hljs-built_in">height</span>).
+
+rotation_moment(img, <span class="hljs-built_in">width</span>, <span class="hljs-built_in">height</span>)
+    Renvoie les <span class="hljs-number">7</span> moments insensibles aux rotations et Ó l'Úchelle de l'<span class="hljs-built_in">image</span> f de taille (<span class="hljs-built_in">width</span> * <span class="hljs-built_in">height</span>) centrÚ sur le centre de gravitÚ de l'<span class="hljs-built_in">image</span>.
+
+scale_moment(img, <span class="hljs-built_in">width</span>, <span class="hljs-built_in">height</span>, mu_00)
+    Renvoie une sÚlÚction de moments insensibles aux translations d'ordres prÚdÚfinis de l'<span class="hljs-built_in">image</span> f de taille (<span class="hljs-built_in">width</span> * <span class="hljs-built_in">height</span>) centrÚ sur le centre de gravitÚ de l'<span class="hljs-built_in">image</span>.
+</code></pre><h1 id="help-on-module-write_masspec-">Help on module write_masspec:</h1>
+<p><strong><em>FUNCTIONS</em></strong></p>
+<pre><code>MSP_files_to_MGF_file(path, filename_mgf=None)
+    <span class="hljs-keyword">Create</span> Mascot <span class="hljs-keyword">format</span> <span class="hljs-keyword">file</span> <span class="hljs-keyword">from</span> multiple MSP files.
+
+mass_spectra_to_mgf(filename, mass_values_list, intensity_values_list, meta_list=<span class="hljs-keyword">None</span>, filter_by_instrument_type=<span class="hljs-keyword">None</span>, <span class="hljs-keyword">names</span>=<span class="hljs-keyword">None</span>, casnos=<span class="hljs-keyword">None</span>, hmdb_ids=<span class="hljs-keyword">None</span>)
+    Write mass spectra <span class="hljs-keyword">in</span> Mascot <span class="hljs-keyword">format</span> file.
+
+nist_msl_to_mgf(filename, new_filename=<span class="hljs-keyword">None</span>)
+    <span class="hljs-keyword">Convert</span> NIST MSL <span class="hljs-keyword">file</span> <span class="hljs-keyword">to</span> Mascot <span class="hljs-keyword">file</span> format.
+</code></pre></body></html>
