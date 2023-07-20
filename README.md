@@ -90,6 +90,9 @@ This is an example of how to use the package.
 
 * Python
 * Rscript
+* Set NIST database location in **matching_nist_lib_from_chromato_cube()** in **matching.py**
+  * Update the path to the NIST database location by setting the **lib_path** argument line 53
+  * Set the **work_dir** line 55
 
 ### Installation
 
