@@ -9,7 +9,7 @@ from utils import generate_lib_scores_from_lib
 DEFAULT_LIB_FILENAME="./lib_EIB.mgf"
 
 if __name__ == "__main__":
-    if (len(sys.argv[1]) == 2):
+    if (len(sys.argv) == 2):
         generate_lib_scores_from_lib(sys.argv[1])
     else:
         print("lib filename: ", DEFAULT_LIB_FILENAME)

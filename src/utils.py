@@ -413,7 +413,7 @@ def generate_lib_scores_from_lib(lib_filename, output_path='./lib_scores.json'):
     logger=logging.getLogger('matchms')
     logger.setLevel('ERROR')
 
-    spectra = list(load_from_mgf(lib_filename))[:100]
+    spectra = list(load_from_mgf(lib_filename))
     scores = calculate_scores(references=spectra,
                             queries=spectra,
                             similarity_function=CosineGreedy(),
