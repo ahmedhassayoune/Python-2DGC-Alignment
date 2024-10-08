@@ -37,7 +37,7 @@ def cohort_identification_and_alignment(PATH, OUTPUT_PATH, mod_time=1.25, method
         subprocess.run(["python", "identification.py", '-p' , PATH, '-f', file, '-op', OUTPUT_PATH, '--mod_time', str(mod_time), '-m', method, '--mode', mode, '--threshold', str(seuil), '--hit_prob_min', str(hit_prob_min),
                         '--abs_threshold', str(ABS_THRESHOLDS), '--cluster', str(cluster), '--min_distance', str(min_distance), '--sigma_ratio', str(sigma_ratio), '--num_sigma', str(num_sigma),
                         '--format_spectra', str(formated_spectra), '--match_factor_min', str(match_factor_min)])
-    subprocess.run(["python", "peak_table_alignment.py", OUTPUT_PATH])
+    #subprocess.run(["python", "peak_table_alignment.py", OUTPUT_PATH])
 
 
 if __name__ == '__main__':
@@ -61,34 +61,6 @@ if __name__ == '__main__':
 
     cohort_identification_and_alignment(args.path, args.output_path, mod_time=args.mod_time, method=args.method, mode=args.mode, seuil=args.threshold, hit_prob_min=args.hit_prob_min, ABS_THRESHOLDS=args.abs_threshold, cluster=args.cluster, min_distance=args.min_distance, sigma_ratio=args.sigma_ratio, num_sigma=args.num_sigma, formated_spectra=args.format_spectra, match_factor_min=args.match_factor_min)
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 '''def test_lib_leaks(mass_spectrum):
     search = pyms_nist_search.Engine(
