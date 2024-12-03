@@ -1,0 +1,56 @@
+# Byte-compiled files
+*.py[cod]
+__pycache__/
+
+# Virtual environment
+venv/
+ENV/
+env/
+.venv/
+
+# VSCode files
+.vscode/
+
+# Jupyter Notebook checkpoints and metadata
+.ipynb_checkpoints/
+*.ipynb-meta
+
+# Python package files
+*.egg-info/
+*.egg
+*.whl
+
+# PyInstaller
+# Usually these files are written by pyinstaller
+dist/
+build/
+*.spec
+
+# Cython debug symbols
+cython_debug/
+
+# Test coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+
+# Logs
+*.log
+*.log.*
+
+# IDE project files (optional, depending on your IDE)
+.idea/
