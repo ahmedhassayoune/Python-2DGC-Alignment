@@ -606,42 +606,33 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     if displacement_interp_meth.lower() in ['natural-neighbor', 'natural-neighbour']:
         # Initialize Displacement2 array
         Displacement2 = np.zeros((2, 2, 2))
-
-        w_corners = [
-            -np.floor(0.05 * Aligned.shape[0]),
-            Aligned.shape[0] + np.ceil(0.05 * Aligned.shape[0]),
-        ]
         
-        x_corners = [
-            -np.floor(0.05 * Aligned.shape[1]),
-            Aligned.shape[1] + np.ceil(0.05 * Aligned.shape[1]),
-        ]
+        padding_w_lower = np.floor(0.05 * Aligned.shape[0])
+        padding_w_upper = np.ceil(0.05 * Aligned.shape[0])
+        padding_x_lower = np.floor(0.05 * Aligned.shape[1])
+        padding_x_upper = np.ceil(0.05 * Aligned.shape[1])
+
         # Compute Displacement2 based on the alignment and reference peaks
         # w: 2nd dimension, x: 1st dimension
-        for w in w_corners:
-            for x in x_corners:
+        for w in (-padding_w_lower, Aligned.shape[0] + padding_w_upper):
+            for x in (-padding_x_lower, Aligned.shape[1] + padding_x_upper):
                 # Compute the distance vector for the pixel
                 Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
                 Distance = np.sqrt(Distance_vec[:, 0] ** 2 + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2)
 
                 # Compute the displacement using a weighted mean
                 weight = 1 / (Distance ** PowerFactor)
-                d2w = (w + int(np.floor(0.05 * Aligned.shape[0]))) // (Aligned.shape[0] + int(np.floor(0.05 * Aligned.shape[0])) + int(np.ceil(0.05 * Aligned.shape[0])))
-                d2x = (x + int(np.floor(0.05 * Aligned.shape[1]))) // (Aligned.shape[1] + int(np.floor(0.05 * Aligned.shape[1])) + int(np.ceil(0.05 * Aligned.shape[1])))
+                d2w = (w + int(padding_w_lower)) // (Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper))
+                d2x = (x + int(padding_x_lower)) // (Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper))
                 Displacement2[d2w, d2x, :] = np.sum(np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0) / np.sum(weight)
 
         # Add a peak at each corner (around the chromatogram with an offset)
         Peaks_Ref = np.vstack([Peaks_Ref, 
-                               # base corners
-                               np.array([[0, 0], 
-                                         [0, Aligned.shape[0]], 
-                                         [Aligned.shape[1], 0], 
-                                         [Aligned.shape[1], Aligned.shape[0]]]) +
-                               # offset
-                               np.array([[-np.floor(0.05 * Aligned.shape[1]), -np.floor(0.05 * Aligned.shape[0])], 
-                                         [-np.floor(0.05 * Aligned.shape[1]), np.ceil(0.05 * Aligned.shape[0])], 
-                                         [np.ceil(0.05 * Aligned.shape[1]), -np.floor(0.05 * Aligned.shape[0])], 
-                                         [np.ceil(0.05 * Aligned.shape[1]), np.ceil(0.05 * Aligned.shape[0])]])
+                               # base corners with offsets
+                               np.array([[-padding_x_lower, -padding_w_lower], 
+                                         [-padding_x_lower, Aligned.shape[0] + padding_w_upper], 
+                                         [Aligned.shape[1] + padding_x_upper, -padding_w_lower], 
+                                         [Aligned.shape[1] + padding_x_upper, Aligned.shape[0] + padding_w_upper]])
                               ])
 
         # Add corresponding displacement values for the added peaks
@@ -653,16 +644,9 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                                         ])
 
         points = np.column_stack((Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD))
-        grid = np.mgrid[-int(np.floor(0.05 * Aligned.shape[0])):Aligned.shape[0] + int(np.ceil(0.05 * Aligned.shape[0])),
-                        -int(np.floor(0.05 * Aligned.shape[1])):Aligned.shape[1] + int(np.ceil(0.05 * Aligned.shape[1]))]
 
-        padding_m_lower = int(np.floor(0.05 * Aligned.shape[0]))
-        padding_m_upper = int(np.ceil(0.05 * Aligned.shape[0]))
-        padding_x_lower = int(np.floor(0.05 * Aligned.shape[1]))
-        padding_x_upper = int(np.ceil(0.05 * Aligned.shape[1]))
-
-        grid = np.mgrid[-padding_m_lower:Aligned.shape[0] + padding_m_upper,
-                        -padding_x_lower:Aligned.shape[1] + padding_x_upper]
+        grid = np.mgrid[-int(padding_w_lower):Aligned.shape[0] + int(padding_w_upper),
+                        -int(padding_x_lower):Aligned.shape[1] + int(padding_x_upper)]
 
         Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
         
