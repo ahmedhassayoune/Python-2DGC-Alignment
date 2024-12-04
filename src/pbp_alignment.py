@@ -10,6 +10,7 @@ from scipy.interpolate import griddata, interp1d
 # TODO: check if we should close something with netCDF4
 # TODO: handle global parameters in a better way (use dictionary)
 # TODO: implement natural-neighbor interpolation
+# TODO: implement DualSibson model
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -372,11 +373,17 @@ def align_2d_chrom_ms_v5(
     model_choice = kwargs.get("model_choice", "normal")
 
     if model_choice == "normal":
-        Aligned, Displacement, Deform_output = alignChromato()
-    elif model_choice == "DualSibson":
-        Aligned, Displacement, Deform_output = (
-            alignChromato_with_SibsonInterp_also_1stD()
+        Aligned, Displacement, Deform_output = align_chromato(
+            Ref=Ref, Target=Other, Peaks_Ref=Peaks_Ref, Peaks_Target=Peaks_Other,
+            DisplacementInterpMeth=Interp_meth, PowerFactor=PowerFactor,
+            Peak_widths=Peak_widths, InterPixelInterpMeth=InterPixelInterpMeth
         )
+    elif model_choice == "DualSibson":
+        # TODO: implement DualSibson model
+        # Aligned, Displacement, Deform_output = (
+        #     alignChromato_with_SibsonInterp_also_1stD()
+        # )
+        pass
     else:
         raise ValueError(f"Invalid model choice: {model_choice}.")
 
@@ -645,14 +652,23 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                                                   [Displacement2[1, 1, 1], Displacement2[1, 1, 0]]])
                                         ])
 
-        Fdist1 = None #TODO: natural-neighbor
+        points = np.column_stack((Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD))
+        grid = np.mgrid[-int(np.floor(0.05 * Aligned.shape[0])):Aligned.shape[0] + int(np.ceil(0.05 * Aligned.shape[0])),
+                        -int(np.floor(0.05 * Aligned.shape[1])):Aligned.shape[1] + int(np.ceil(0.05 * Aligned.shape[1]))]
+
+        padding_m_lower = int(np.floor(0.05 * Aligned.shape[0]))
+        padding_m_upper = int(np.ceil(0.05 * Aligned.shape[0]))
+        padding_x_lower = int(np.floor(0.05 * Aligned.shape[1]))
+        padding_x_upper = int(np.ceil(0.05 * Aligned.shape[1]))
+
+        grid = np.mgrid[-padding_m_lower:Aligned.shape[0] + padding_m_upper,
+                        -padding_x_lower:Aligned.shape[1] + padding_x_upper]
+
+        Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
+        
+        #TODO: natural-neighbor
         # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
         # Fdist1 = NearestNDInterpolator(Peaks_Ref[:, [1, 0]] * PeakWidth2ndD / PeakWidth1stD, Peaks_displacement[:, 1], fill_value='extrapolate')
-        # grid_ranges = [
-        #     [0, Aligned.shape[0], 1],  # range for the first dimension (x)
-        #     [0, Aligned.shape[1]*PeakWidth2ndD/PeakWidth1stD, 1]   # range for the second dimension (w)
-        # ]
-        # Fdist1 = naturalneighbor.griddata(known_points=, known_values=, interp_ranges=grid_ranges)
     
     Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
     Hep1 = Hep[:, 0]
