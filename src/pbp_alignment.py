@@ -32,9 +32,6 @@ TARGET_CHROMATOGRAM_FILE = "Test_target_chromatogram.cdf"
 REFERENCE_ALIGNMENT_PTS_FILE = "Alignment_pts_Reference.csv"
 TARGET_ALIGNMENT_PTS_FILE = "Alignment_pts_Target.csv"
 
-# Console output level
-prompt_output = "minimal"
-
 # UNITS
 UNITS = "pixel"  # Units for typical peak width and alignment points
 # ---------------------------------------------------------------------
@@ -244,31 +241,6 @@ def load_alignment_points(
         TYPICAL_PEAK_WIDTH = typical_peak_width
 
     return reference_peaks, target_peaks
-
-
-def align_chromatograms(
-    ChromatoRef,
-    ChromatoTarget,
-    Reference_peaks,
-    Target_peaks,
-    NbPix2ndD_Ref,
-    typical_peak_width,
-    model_choice,
-):
-    """
-    aligned_results = Align2DChrom_MS_v5(
-        Ref_TIC=ChromatoRef['MStotint'],
-        Target_TIC=ChromatoTarget['MStotint'],
-        Reference_peaks=Reference_peaks,
-        Target_peaks=Target_peaks,
-        MSvaluebox=ChromatoTarget['MSvaluebox'],
-        MSintbox=ChromatoTarget['MSintbox'],
-        NbPix2ndD_Ref=NbPix2ndD_Ref,
-        Peak_widths=typical_peak_width,
-        model_choice=model_choice
-    )
-    """
-    return
 
 
 def reshape_chromatogram_data(data, NbPix):
@@ -522,10 +494,10 @@ def align_2d_chrom_ms_v5(
     Alignedmedionid = np.cumsum(Alignedeachscannum)
 
     return {
-        "AlignedMSvaluebox": final_mz_values,
-        "AlignedMSintbox": final_intensities,
-        "Alignedeachscannum": Alignedeachscannum,
-        "Alignedmedionid": Alignedmedionid,
+        "MSvaluebox": final_mz_values,
+        "MSintbox": final_intensities,
+        "eachscannum": Alignedeachscannum,
+        "ionid": Alignedmedionid,
         "Aligned": Aligned,
         "Displacement": Displacement,
         "Deform_output": Deform_output,
@@ -603,56 +575,55 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Displacement = np.zeros((Target.shape[0], Target.shape[1], 2))
 
     # -- Compute displacement of peaks and interpolate (1st dim: linear, 2nd dim: natural-neighbor)
-    if displacement_interp_meth.lower() in ['natural-neighbor', 'natural-neighbour']:
-        # Initialize Displacement2 array
-        Displacement2 = np.zeros((2, 2, 2))
+    # Initialize Displacement2 array
+    Displacement2 = np.zeros((2, 2, 2))
         
-        padding_w_lower = np.floor(0.05 * Aligned.shape[0])
-        padding_w_upper = np.ceil(0.05 * Aligned.shape[0])
-        padding_x_lower = np.floor(0.05 * Aligned.shape[1])
-        padding_x_upper = np.ceil(0.05 * Aligned.shape[1])
+    padding_w_lower = np.floor(0.05 * Aligned.shape[0])
+    padding_w_upper = np.ceil(0.05 * Aligned.shape[0])
+    padding_x_lower = np.floor(0.05 * Aligned.shape[1])
+    padding_x_upper = np.ceil(0.05 * Aligned.shape[1])
 
-        # Compute Displacement2 based on the alignment and reference peaks
-        # w: 2nd dimension, x: 1st dimension
-        for w in (-padding_w_lower, Aligned.shape[0] + padding_w_upper):
-            for x in (-padding_x_lower, Aligned.shape[1] + padding_x_upper):
-                # Compute the distance vector for the pixel
-                Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
-                Distance = np.sqrt(Distance_vec[:, 0] ** 2 + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2)
+    # Compute Displacement2 based on the alignment and reference peaks
+    # w: 2nd dimension, x: 1st dimension
+    for w in (-padding_w_lower, Aligned.shape[0] + padding_w_upper):
+        for x in (-padding_x_lower, Aligned.shape[1] + padding_x_upper):
+            # Compute the distance vector for the pixel
+            Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
+            Distance = np.sqrt(Distance_vec[:, 0] ** 2 + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2)
 
-                # Compute the displacement using a weighted mean
-                weight = 1 / (Distance ** PowerFactor)
-                d2w = (w + int(padding_w_lower)) // (Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper))
-                d2x = (x + int(padding_x_lower)) // (Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper))
-                Displacement2[d2w, d2x, :] = np.sum(np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0) / np.sum(weight)
+            # Compute the displacement using a weighted mean
+            weight = 1 / (Distance ** PowerFactor)
+            d2w = (w + int(padding_w_lower)) // (Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper))
+            d2x = (x + int(padding_x_lower)) // (Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper))
+            Displacement2[d2w, d2x, :] = np.sum(np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0) / np.sum(weight)
 
-        # Add a peak at each corner (around the chromatogram with an offset)
-        Peaks_Ref = np.vstack([Peaks_Ref, 
-                               # base corners with offsets
-                               np.array([[-padding_x_lower, -padding_w_lower], 
-                                         [-padding_x_lower, Aligned.shape[0] + padding_w_upper], 
-                                         [Aligned.shape[1] + padding_x_upper, -padding_w_lower], 
-                                         [Aligned.shape[1] + padding_x_upper, Aligned.shape[0] + padding_w_upper]])
-                              ])
+    # Add a peak at each corner (around the chromatogram with an offset)
+    Peaks_Ref = np.vstack([Peaks_Ref, 
+                            # base corners with offsets
+                            np.array([[-padding_x_lower, -padding_w_lower], 
+                                        [-padding_x_lower, Aligned.shape[0] + padding_w_upper], 
+                                        [Aligned.shape[1] + padding_x_upper, -padding_w_lower], 
+                                        [Aligned.shape[1] + padding_x_upper, Aligned.shape[0] + padding_w_upper]])
+                            ])
 
-        # Add corresponding displacement values for the added peaks
-        Peaks_displacement = np.vstack([Peaks_displacement, 
-                                        np.array([[Displacement2[0, 0, 1], Displacement2[0, 0, 0]],
-                                                  [Displacement2[1, 0, 1], Displacement2[1, 0, 0]],
-                                                  [Displacement2[0, 1, 1], Displacement2[0, 1, 0]],
-                                                  [Displacement2[1, 1, 1], Displacement2[1, 1, 0]]])
-                                        ])
+    # Add corresponding displacement values for the added peaks
+    Peaks_displacement = np.vstack([Peaks_displacement, 
+                                    np.array([[Displacement2[0, 0, 1], Displacement2[0, 0, 0]],
+                                                [Displacement2[1, 0, 1], Displacement2[1, 0, 0]],
+                                                [Displacement2[0, 1, 1], Displacement2[0, 1, 0]],
+                                                [Displacement2[1, 1, 1], Displacement2[1, 1, 0]]])
+                                    ])
 
-        points = np.column_stack((Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD))
+    points = np.column_stack((Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD))
 
-        grid = np.mgrid[-int(padding_w_lower):Aligned.shape[0] + int(padding_w_upper),
-                        -int(padding_x_lower):Aligned.shape[1] + int(padding_x_upper)]
+    grid = np.mgrid[-int(padding_w_lower):Aligned.shape[0] + int(padding_w_upper),
+                    -int(padding_x_lower):Aligned.shape[1] + int(padding_x_upper)]
 
-        Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
+    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
         
-        #TODO: natural-neighbor
-        # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
-        # Fdist1 = NearestNDInterpolator(Peaks_Ref[:, [1, 0]] * PeakWidth2ndD / PeakWidth1stD, Peaks_displacement[:, 1], fill_value='extrapolate')
+    #TODO: natural-neighbor
+    # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
+    # Fdist1 = NearestNDInterpolator(Peaks_Ref[:, [1, 0]] * PeakWidth2ndD / PeakWidth1stD, Peaks_displacement[:, 1], fill_value='extrapolate')
     
     Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
     Hep1 = Hep[:, 0]
@@ -740,7 +711,9 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
     Displacement_Extended[1:-1, 1:-1, :] = Displacement
     
-    Fdist1bis = None #TODO: naturalneighbor
+    points = np.column_stack((Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * PeakWidth2ndD / PeakWidth1stD))
+    Fdist1bis = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
+    #TODO: Fdist1bis = naturalneighbor
     
     for w in [0, Aligned.shape[0] + 1]:
         for x in range(Aligned.shape[1] + 1):
@@ -897,25 +870,24 @@ if __name__ == "__main__":
         Peak_widths=TYPICAL_PEAK_WIDTH,
         model_choice=MODEL_CHOICE,
     )
+    
+    Alignedeachscannum = np.sum(aligned_result["MSvaluebox"] != 0, axis=1)
+    Alignedionid = np.cumsum(Alignedeachscannum)
+    AlignedMStotint = np.sum(aligned_result["MSintbox"], axis=1)
 
-    """
-    TODO: do this after alignment
-    Alignedeachscannum= sum(AlignedMSvaluebox~=0,2);
-    Alignedionid = cumsum(Alignedeachscannum);
-
-    AlignedMStotint = sum(AlignedMSintbox,2);
-    toc
-
-    TICaligned = sum(AlignedMSintbox,2);
-    TIC_2Daligned=reshape([TICaligned;zeros(NbPix2ndD_target-mod(length(AlignedMStotint),NbPix2ndD_target),1)],...
-        NbPix2ndD_target,[]);
-    """
+    aligned_result["scannum"] = ChromatoTarget["scannum"]
+    aligned_result["flag"] = ChromatoTarget["flag"]
+    aligned_result["medmsmax"] = ChromatoTarget["medmsmax"]
+    aligned_result["medmsmin"] = ChromatoTarget["medmsmin"]
+    aligned_result["scantime"] = ChromatoTarget["scantime"]
+    aligned_result["eachscannum"] = Alignedeachscannum
+    aligned_result["ionid"] = Alignedionid
+    aligned_result["MStotint"] = AlignedMStotint
 
     print("Saving aligned chromatogram.")
     output_file_name = os.path.join(
         OUTPUT_PATH, os.path.splitext(TARGET_CHROMATOGRAM_FILE)[0] + "_ALIGNED.cdf"
     )
 
-    aligned_chromato = ChromatoTarget
-    save_chromatogram(output_file_name, aligned_chromato)
+    save_chromatogram(output_file_name, aligned_result)
     print("Aligned chromatogram saved successfully.")
