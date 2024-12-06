@@ -346,9 +346,14 @@ def align_2d_chrom_ms_v5(
 
     if model_choice == "normal":
         Aligned, Displacement, Deform_output = align_chromato(
-            Ref=Ref, Target=Other, Peaks_Ref=Peaks_Ref, Peaks_Target=Peaks_Other,
-            DisplacementInterpMeth=Interp_meth, PowerFactor=PowerFactor,
-            Peak_widths=Peak_widths, InterPixelInterpMeth=InterPixelInterpMeth
+            Ref=Ref,
+            Target=Other,
+            Peaks_Ref=Peaks_Ref,
+            Peaks_Target=Peaks_Other,
+            DisplacementInterpMeth=Interp_meth,
+            PowerFactor=PowerFactor,
+            Peak_widths=Peak_widths,
+            InterPixelInterpMeth=InterPixelInterpMeth,
         )
     elif model_choice == "DualSibson":
         # TODO: implement DualSibson model
@@ -534,10 +539,11 @@ def compute_alignment(
     )
     return aligned_index, Def
 
+
 def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     """
     Aligns the target chromatogram to the reference chromatogram.
-    
+
     Parameters:
         ref (numpy.ndarray): Reference chromatogram (2D matrix).
         target (numpy.ndarray): Target chromatogram (2D matrix).
@@ -548,28 +554,28 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
             - 'PowerFactor' (float): Weighting factor for inverse distance, default 2.
             - 'Peak_widths' (list): Typical peak widths [width_1st_dim, width_2nd_dim], default [1, 1].
             - 'InterPixelInterpMeth' (str): Interpolation method for intensity, default 'cubic'.
-    
+
     Returns:
         aligned (numpy.ndarray): Aligned chromatogram.
         displacement (numpy.ndarray): Displacement matrix [m, n, 2].
         deform_output (numpy.ndarray): Deformation correction matrix [m, n, 2].
     """
     # Default optional arguments
-    displacement_interp_meth = kwargs.get('DisplacementInterpMeth', 'natural-neighbor')
-    PowerFactor = kwargs.get('PowerFactor', 2)
-    peak_widths = kwargs.get('Peak_widths', [1, 1])
-    InterPixelInterpMeth = kwargs.get('InterPixelInterpMeth', 'cubic')
-    
+    displacement_interp_meth = kwargs.get("DisplacementInterpMeth", "natural-neighbor")
+    PowerFactor = kwargs.get("PowerFactor", 2)
+    peak_widths = kwargs.get("Peak_widths", [1, 1])
+    InterPixelInterpMeth = kwargs.get("InterPixelInterpMeth", "cubic")
+
     # Ensure ref and target have the same size
     Ref, Target = equalize_size(Ref, Target)
-    
+
     # Normalize distances
     PeakWidth2ndD = peak_widths[1]
     PeakWidth1stD = peak_widths[0]
-    
+
     # Compute displacement
     Peaks_displacement = Peaks_Target - Peaks_Ref
-    
+
     # Initialize output arrays
     Aligned = np.zeros_like(Target)
     Displacement = np.zeros((Target.shape[0], Target.shape[1], 2))
@@ -577,7 +583,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     # -- Compute displacement of peaks and interpolate (1st dim: linear, 2nd dim: natural-neighbor)
     # Initialize Displacement2 array
     Displacement2 = np.zeros((2, 2, 2))
-        
+
     padding_w_lower = np.floor(0.05 * Aligned.shape[0])
     padding_w_upper = np.ceil(0.05 * Aligned.shape[0])
     padding_x_lower = np.floor(0.05 * Aligned.shape[1])
@@ -589,42 +595,72 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         for x in (-padding_x_lower, Aligned.shape[1] + padding_x_upper):
             # Compute the distance vector for the pixel
             Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
-            Distance = np.sqrt(Distance_vec[:, 0] ** 2 + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2)
+            Distance = np.sqrt(
+                Distance_vec[:, 0] ** 2
+                + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2
+            )
 
             # Compute the displacement using a weighted mean
-            weight = 1 / (Distance ** PowerFactor)
-            d2w = (w + int(padding_w_lower)) // (Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper))
-            d2x = (x + int(padding_x_lower)) // (Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper))
-            Displacement2[d2w, d2x, :] = np.sum(np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0) / np.sum(weight)
+            weight = 1 / (Distance**PowerFactor)
+            d2w = (w + int(padding_w_lower)) // (
+                Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper)
+            )
+            d2x = (x + int(padding_x_lower)) // (
+                Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper)
+            )
+            Displacement2[d2w, d2x, :] = np.sum(
+                np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0
+            ) / np.sum(weight)
 
     # Add a peak at each corner (around the chromatogram with an offset)
-    Peaks_Ref = np.vstack([Peaks_Ref, 
-                            # base corners with offsets
-                            np.array([[-padding_x_lower, -padding_w_lower], 
-                                        [-padding_x_lower, Aligned.shape[0] + padding_w_upper], 
-                                        [Aligned.shape[1] + padding_x_upper, -padding_w_lower], 
-                                        [Aligned.shape[1] + padding_x_upper, Aligned.shape[0] + padding_w_upper]])
-                            ])
+    Peaks_Ref = np.vstack(
+        [
+            Peaks_Ref,
+            # base corners with offsets
+            np.array(
+                [
+                    [-padding_x_lower, -padding_w_lower],
+                    [-padding_x_lower, Aligned.shape[0] + padding_w_upper],
+                    [Aligned.shape[1] + padding_x_upper, -padding_w_lower],
+                    [
+                        Aligned.shape[1] + padding_x_upper,
+                        Aligned.shape[0] + padding_w_upper,
+                    ],
+                ]
+            ),
+        ]
+    )
 
     # Add corresponding displacement values for the added peaks
-    Peaks_displacement = np.vstack([Peaks_displacement, 
-                                    np.array([[Displacement2[0, 0, 1], Displacement2[0, 0, 0]],
-                                                [Displacement2[1, 0, 1], Displacement2[1, 0, 0]],
-                                                [Displacement2[0, 1, 1], Displacement2[0, 1, 0]],
-                                                [Displacement2[1, 1, 1], Displacement2[1, 1, 0]]])
-                                    ])
+    Peaks_displacement = np.vstack(
+        [
+            Peaks_displacement,
+            np.array(
+                [
+                    [Displacement2[0, 0, 1], Displacement2[0, 0, 0]],
+                    [Displacement2[1, 0, 1], Displacement2[1, 0, 0]],
+                    [Displacement2[0, 1, 1], Displacement2[0, 1, 0]],
+                    [Displacement2[1, 1, 1], Displacement2[1, 1, 0]],
+                ]
+            ),
+        ]
+    )
 
-    points = np.column_stack((Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD))
+    points = np.column_stack(
+        (Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD)
+    )
 
-    grid = np.mgrid[-int(padding_w_lower):Aligned.shape[0] + int(padding_w_upper),
-                    -int(padding_x_lower):Aligned.shape[1] + int(padding_x_upper)]
+    grid = np.mgrid[
+        -int(padding_w_lower) : Aligned.shape[0] + int(padding_w_upper),
+        -int(padding_x_lower) : Aligned.shape[1] + int(padding_x_upper),
+    ]
 
-    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
-        
-    #TODO: natural-neighbor
+    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method="cubic")
+
+    # TODO: natural-neighbor
     # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
     # Fdist1 = NearestNDInterpolator(Peaks_Ref[:, [1, 0]] * PeakWidth2ndD / PeakWidth1stD, Peaks_displacement[:, 1], fill_value='extrapolate')
-    
+
     Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
     Hep1 = Hep[:, 0]
     Hep2 = Hep[:, 1]
@@ -651,37 +687,64 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
             puet = 1
 
     Hap = np.array(Hap)
-    
+
     # Linear interpolation inside the convex hull
-    Hum = interp1d(Hap[:, 0], Hap[:, 1], kind='linear', fill_value='extrapolate')(np.arange(Target.shape[1]))
-    
+    Hum = interp1d(Hap[:, 0], Hap[:, 1], kind="linear", fill_value="extrapolate")(
+        np.arange(Target.shape[1])
+    )
+
     # Linear extrapolation for outside the convex hull
     Pks = Peaks_Ref[:-4, 0]
     Displ1D = Peaks_displacement[:-4, 0]
-    Hum2 = interp1d([np.mean(Pks[Pks == np.min(Peaks_Ref[:-4, 0])]), np.mean(Pks[Pks == np.max(Peaks_Ref[:-4, 0])])],
-                    [np.mean(Displ1D[Pks == np.min(Peaks_Ref[:-4, 0])]), np.mean(Displ1D[Pks == np.max(Peaks_Ref[:-4, 0])])],
-                    kind='linear', fill_value='extrapolate')(np.arange(Target.shape[1]))
-    
+    Hum2 = interp1d(
+        [
+            np.mean(Pks[Pks == np.min(Peaks_Ref[:-4, 0])]),
+            np.mean(Pks[Pks == np.max(Peaks_Ref[:-4, 0])]),
+        ],
+        [
+            np.mean(Displ1D[Pks == np.min(Peaks_Ref[:-4, 0])]),
+            np.mean(Displ1D[Pks == np.max(Peaks_Ref[:-4, 0])]),
+        ],
+        kind="linear",
+        fill_value="extrapolate",
+    )(np.arange(Target.shape[1]))
+
     # Populate the displacement matrix
     Displacement = np.zeros_like(Aligned)
     for w in range(Aligned.shape[0]):
         for x in range(Aligned.shape[1]):
             if Aligned[w, x] == 0:
                 if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
-                    Displacement[w, x, :] = [Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD), Hum[x]]
+                    Displacement[w, x, :] = [
+                        Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD),
+                        Hum[x],
+                    ]
                 else:
-                    Displacement[w, x, :] = [Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD), Hum2[x]]
-    
+                    Displacement[w, x, :] = [
+                        Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD),
+                        Hum2[x],
+                    ]
+
     # Prepare the output grid (X,Y,Z)
     X = np.ones((Ref.shape[0] * 2, 1)) * np.arange(Ref.shape[1])
-    Y = (np.arange(-round(Ref.shape[0] / 2), Ref.shape[0] + (Ref.shape[0] - round(Ref.shape[0] / 2)))
-        .reshape(-1, 1) * np.ones((1, Ref.shape[1])))
-    
+    Y = np.arange(
+        -round(Ref.shape[0] / 2),
+        Ref.shape[0] + (Ref.shape[0] - round(Ref.shape[0] / 2)),
+    ).reshape(-1, 1) * np.ones((1, Ref.shape[1]))
+
     Z = np.zeros((Target.shape[0] * 2, Target.shape[1]))
-    Z[:int(np.floor(Target.shape[0] / 2)), 1:] = Target[int(np.floor(Target.shape[0] / 2)): , :-1]
-    Z[int(np.round(Target.shape[0] / 2)) : int(np.round(Target.shape[0] / 2)) + Target.shape[0], :] = Target
-    Z[int(np.floor(Target.shape[0] / 2)) + Target.shape[0]:, :-1] = Target[:int(np.ceil(Target.shape[0] / 2)), 1:]
-    
+    Z[: int(np.floor(Target.shape[0] / 2)), 1:] = Target[
+        int(np.floor(Target.shape[0] / 2)) :, :-1
+    ]
+    Z[
+        int(np.round(Target.shape[0] / 2)) : int(np.round(Target.shape[0] / 2))
+        + Target.shape[0],
+        :,
+    ] = Target
+    Z[int(np.floor(Target.shape[0] / 2)) + Target.shape[0] :, :-1] = Target[
+        : int(np.ceil(Target.shape[0] / 2)), 1:
+    ]
+
     def interpolate_2d(X, Y, Z, Xq, Yq, method):
         points = np.column_stack((X.ravel(), Y.ravel()))
         values = Z.ravel()
@@ -690,50 +753,72 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         return Aligned.reshape(Xq.shape)
 
     mid_idx = round(Target.shape[0] / 2)
-    Xq = X[mid_idx:(mid_idx + Target.shape[0]), :] + Displacement[:, :, 1]
-    Yq = Y[mid_idx:(mid_idx + Target.shape[0]), :] + Displacement[:, :, 0]
-    
-    if InterPixelInterpMeth in ['spline', 'cubic', 'linear']:
-        method = 'cubic' if InterPixelInterpMeth == 'spline' else InterPixelInterpMeth
+    Xq = X[mid_idx : (mid_idx + Target.shape[0]), :] + Displacement[:, :, 1]
+    Yq = Y[mid_idx : (mid_idx + Target.shape[0]), :] + Displacement[:, :, 0]
+
+    if InterPixelInterpMeth in ["spline", "cubic", "linear"]:
+        method = "cubic" if InterPixelInterpMeth == "spline" else InterPixelInterpMeth
         Aligned = interpolate_2d(X, Y, Z, Xq, Yq, method)
     else:
         raise ValueError(f"Unsupported interpolation method: {InterPixelInterpMeth}")
-    
+
     Aligned[np.isnan(Aligned)] = 0
     for k in range(len(Peaks_displacement) - 4):
         Displacement[Peaks_Ref[k, 1], Peaks_Ref[k, 0], :] = Peaks_displacement[k, ::-1]
-    
+
     # Initialize deformation arrays
     Deform1 = np.zeros_like(Aligned)
     Deform2 = np.zeros_like(Aligned)
-    
+
     # Extend Displacement with borders
     Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
     Displacement_Extended[1:-1, 1:-1, :] = Displacement
-    
-    points = np.column_stack((Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * PeakWidth2ndD / PeakWidth1stD))
-    Fdist1bis = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method='cubic')
-    #TODO: Fdist1bis = naturalneighbor
-    
+
+    points = np.column_stack(
+        (Peaks_Ref[:, 1] + 1, (Peaks_Ref[:, 0] + 1) * PeakWidth2ndD / PeakWidth1stD)
+    )
+    Fdist1bis = griddata(
+        points, values=Peaks_displacement[:, 1], xi=grid, method="cubic"
+    )
+    # TODO: Fdist1bis = naturalneighbor
+
     for w in [0, Aligned.shape[0] + 1]:
         for x in range(Aligned.shape[1] + 1):
             if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
-                Displacement_Extended[w, x, :] = [Fdist1bis(w, x*PeakWidth2ndD/PeakWidth1stD), Hum[x]]
+                Displacement_Extended[w, x, :] = [
+                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Hum[x],
+                ]
             else:
-                Displacement_Extended[w, x, :] = [Fdist1bis(w, x*PeakWidth2ndD/PeakWidth1stD), Hum2[x]]
+                Displacement_Extended[w, x, :] = [
+                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Hum2[x],
+                ]
 
     for w in range(1, Aligned.shape[0]):
         for x in [0, Aligned.shape[1] + 1]:
             if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
-                Displacement_Extended[w, x, :] = [Fdist1bis(w, x*PeakWidth2ndD/PeakWidth1stD), Hum[x]]
+                Displacement_Extended[w, x, :] = [
+                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Hum[x],
+                ]
             else:
-                Displacement_Extended[w, x, :] = [Fdist1bis(w, x*PeakWidth2ndD/PeakWidth1stD), Hum2[x]]
+                Displacement_Extended[w, x, :] = [
+                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Hum2[x],
+                ]
 
     # Compute Deformation
     for w in range(Aligned.shape[0]):
         for x in range(Aligned.shape[1]):
-            Deform1[w, x] = 2 + (-Displacement_Extended[w, x+1, 0] + Displacement_Extended[w + 2, x+1, 0])
-            Deform2[w, x] = 2 + (-Displacement_Extended[w+1, x, 1] + Displacement_Extended[w+1, x + 2, 1])
+            Deform1[w, x] = 2 + (
+                -Displacement_Extended[w, x + 1, 0]
+                + Displacement_Extended[w + 2, x + 1, 0]
+            )
+            Deform2[w, x] = 2 + (
+                -Displacement_Extended[w + 1, x, 1]
+                + Displacement_Extended[w + 1, x + 2, 1]
+            )
 
     # Correct for negative deformations
     if np.any(Deform1 < 0) or np.any(Deform2 < 0):
@@ -748,18 +833,18 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Deform_output = np.zeros(SzE)
     Deform_output[:, :, 0] = Deform1
     Deform_output[:, :, 1] = Deform2
-    
+
     return Aligned, Displacement, Deform_output
-    
+
 
 def equalize_size(chromato1, chromato2):
     """
     Equalizes the size of two GCxGC chromatograms by adding zeros where needed.
-    
+
     Parameters:
         chromato1 (numpy.ndarray): First chromatogram.
         chromato2 (numpy.ndarray): Second chromatogram.
-    
+
     Returns:
         tuple: Two chromatograms of equal size (numpy.ndarrays).
     """
@@ -772,8 +857,8 @@ def equalize_size(chromato1, chromato2):
         chromato2_eq = np.zeros(max_shape)
 
         # Fill in the original data
-        chromato1_eq[:chromato1.shape[0], :chromato1.shape[1]] = chromato1
-        chromato2_eq[:chromato2.shape[0], :chromato2.shape[1]] = chromato2
+        chromato1_eq[: chromato1.shape[0], : chromato1.shape[1]] = chromato1
+        chromato2_eq[: chromato2.shape[0], : chromato2.shape[1]] = chromato2
     else:
         chromato1_eq = chromato1
         chromato2_eq = chromato2
@@ -870,7 +955,7 @@ if __name__ == "__main__":
         Peak_widths=TYPICAL_PEAK_WIDTH,
         model_choice=MODEL_CHOICE,
     )
-    
+
     Alignedeachscannum = np.sum(aligned_result["MSvaluebox"] != 0, axis=1)
     Alignedionid = np.cumsum(Alignedeachscannum)
     AlignedMStotint = np.sum(aligned_result["MSintbox"], axis=1)
