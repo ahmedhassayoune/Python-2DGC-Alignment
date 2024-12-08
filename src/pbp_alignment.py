@@ -23,6 +23,7 @@ DRIFTMS = 0  # Drift mass spectrum adjustment
 # MODEL CHOICE PARAMETERS
 TYPICAL_PEAK_WIDTH = [1, 5]  # Typical width of a peak in first and second dimension
 MODEL_CHOICE = "normal"  # Model choice ('normal' or 'DualSibson')
+UNITS = "pixel"  # Units for typical peak width and alignment points
 
 # I/O PARAMETERS
 OUTPUT_PATH = "/home/ahassayoune/GCxGC-MS-alignment/users/output/"
@@ -31,9 +32,6 @@ REFERENCE_CHROMATOGRAM_FILE = "Test_reference_chromatogram.cdf"
 TARGET_CHROMATOGRAM_FILE = "Test_target_chromatogram.cdf"
 REFERENCE_ALIGNMENT_PTS_FILE = "Alignment_pts_Reference.csv"
 TARGET_ALIGNMENT_PTS_FILE = "Alignment_pts_Target.csv"
-
-# UNITS
-UNITS = "pixel"  # Units for typical peak width and alignment points
 # ---------------------------------------------------------------------
 
 
@@ -376,7 +374,7 @@ def align_2d_chrom_ms_v5(
     Defm = [np.zeros_like(MSpixelsInds, dtype=float) for _ in range(4)]
 
     # -------------------------
-    FrstDFlag, ScndDFlag = 1, 1
+    FrstDFlag, ScndDFlag = 0, 0
     for ht in range(len(AlignedInds[0])):
         # Compute r, s, t, u for interpolation
         Interp_distr[ht] = Displacement[ScndDFlag, FrstDFlag, 1] - np.floor(
@@ -393,8 +391,11 @@ def align_2d_chrom_ms_v5(
         )
 
         # Update pixel counts
-        ScndDFlag += 1
-        FrstDFlag += ht == NbPix2ndD * np.round(ht / NbPix2ndD)
+        if ht % NbPix2ndD != 0:
+            ScndDFlag += 1
+        else:
+            FrstDFlag += 1
+            ScndDFlag = 0
 
     # Correct indices that are outside the chromatogram
     Interp_distr[Interp_distr == 0] = 0.5
@@ -405,7 +406,7 @@ def align_2d_chrom_ms_v5(
 
     # Process for each corner (a, b, c, d)
     for corner in range(4):
-        FrstDFlag, ScndDFlag = 1, 1
+        FrstDFlag, ScndDFlag = 0, 0
         aligned_indices = AlignedInds[corner]
         MSvaluebox_aligned = AlignedMSvaluebox[corner]
         MSintbox_aligned = AlignedMSintbox[corner]
@@ -413,12 +414,15 @@ def align_2d_chrom_ms_v5(
 
         for ht in range(len(aligned_indices)):
             aligned_indices[ht], Def[ht] = compute_alignment(
-                Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
+                ht, Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
             )
 
             # Update pixel counts
-            ScndDFlag += 1
-            FrstDFlag += ht == NbPix2ndD * np.round(ht / NbPix2ndD)
+            if ht % NbPix2ndD != 0:
+                ScndDFlag += 1
+            else:
+                FrstDFlag += 1
+                ScndDFlag = 0
 
         # Correct indices and handle out-of-bounds
         aligned_indices[aligned_indices > np.max(MSpixelsInds)] = 0
@@ -444,8 +448,8 @@ def align_2d_chrom_ms_v5(
     del aligned_indices
 
     # Put the 4 corners interpolated values in the matrices
-    AlignedMSvalueboxI = np.hstack(MSvaluebox_aligned)
-    AlignedMSintboxI = np.hstack(MSintbox_aligned)
+    AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox)
+    AlignedMSintboxI = np.concatenate(AlignedMSintbox)
 
     # Remove zeros temporarily by replacing them with the maximum integer value
     AlignedMSvalueboxI[AlignedMSvalueboxI == 0] = np.iinfo(np.int32).max
@@ -510,7 +514,7 @@ def align_2d_chrom_ms_v5(
 
 
 def compute_alignment(
-    Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
+    ht, Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
 ):
     """
     Computes the alignment for a given corner (a, b, c, or d).
@@ -537,7 +541,7 @@ def compute_alignment(
         * Deform_output[ScndDFlag, FrstDFlag, 1]
         / 4
     )
-    return aligned_index, Def
+    return aligned_index + ht, Def
 
 
 def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
@@ -608,7 +612,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
             d2x = (x + int(padding_x_lower)) // (
                 Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper)
             )
-            Displacement2[d2w, d2x, :] = np.sum(
+            Displacement2[int(d2w), int(d2x), :] = np.sum(
                 np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0
             ) / np.sum(weight)
 
@@ -650,12 +654,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         (Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD)
     )
 
-    grid = np.mgrid[
+    gridw, gridx = np.mgrid[
         -int(padding_w_lower) : Aligned.shape[0] + int(padding_w_upper),
-        -int(padding_x_lower) : Aligned.shape[1] + int(padding_x_upper),
+        -int(padding_x_lower * PeakWidth2ndD / PeakWidth1stD) : int((Aligned.shape[1] + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD),
     ]
 
-    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=grid, method="cubic")
+    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="cubic")
 
     # TODO: natural-neighbor
     # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
@@ -677,9 +681,9 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
 
     for kui in range(len(Herp)):
         for zui in range(len(Hap)):
-            if Herp[kui, 0] == Hap[zui, 0]:
+            if Herp[kui, 0] == Hap[zui][0]:
                 puet = 0
-                Peaks_displacement[Herp[:, 0] == Hap[zui, 0], 0] = Herp[zui, 1]
+                Peaks_displacement[:-4][Herp[:, 0] == Hap[zui][0], 0] = Herp[zui, 1]
         if puet:
             Hap.append(Herp[kui])
             k += 1
@@ -694,34 +698,33 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     )
 
     # Linear extrapolation for outside the convex hull
-    Pks = Peaks_Ref[:-4, 0]
-    Displ1D = Peaks_displacement[:-4, 0]
+    Pks, Displ1D = Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]
+    minPks, maxPks = np.min(Pks), np.max(Pks)
     Hum2 = interp1d(
         [
-            np.mean(Pks[Pks == np.min(Peaks_Ref[:-4, 0])]),
-            np.mean(Pks[Pks == np.max(Peaks_Ref[:-4, 0])]),
+            minPks,
+            maxPks
         ],
         [
-            np.mean(Displ1D[Pks == np.min(Peaks_Ref[:-4, 0])]),
-            np.mean(Displ1D[Pks == np.max(Peaks_Ref[:-4, 0])]),
+            np.mean(Displ1D[Pks == minPks]),
+            np.mean(Displ1D[Pks == maxPks]),
         ],
         kind="linear",
         fill_value="extrapolate",
-    )(np.arange(Target.shape[1]))
+    )(np.arange(Target.shape[1]+2))
 
     # Populate the displacement matrix
-    Displacement = np.zeros_like(Aligned)
     for w in range(Aligned.shape[0]):
         for x in range(Aligned.shape[1]):
             if Aligned[w, x] == 0:
                 if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
                     Displacement[w, x, :] = [
-                        Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD),
+                        Fdist1[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                         Hum[x],
                     ]
                 else:
                     Displacement[w, x, :] = [
-                        Fdist1(w, x * PeakWidth2ndD / PeakWidth1stD),
+                        Fdist1[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                         Hum2[x],
                     ]
 
@@ -764,7 +767,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
 
     Aligned[np.isnan(Aligned)] = 0
     for k in range(len(Peaks_displacement) - 4):
-        Displacement[Peaks_Ref[k, 1], Peaks_Ref[k, 0], :] = Peaks_displacement[k, ::-1]
+        Displacement[int(Peaks_Ref[k, 1]), int(Peaks_Ref[k, 0]), :] = Peaks_displacement[k, ::-1]
 
     # Initialize deformation arrays
     Deform1 = np.zeros_like(Aligned)
@@ -778,7 +781,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         (Peaks_Ref[:, 1] + 1, (Peaks_Ref[:, 0] + 1) * PeakWidth2ndD / PeakWidth1stD)
     )
     Fdist1bis = griddata(
-        points, values=Peaks_displacement[:, 1], xi=grid, method="cubic"
+        points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="cubic"
     )
     # TODO: Fdist1bis = naturalneighbor
 
@@ -786,12 +789,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         for x in range(Aligned.shape[1] + 1):
             if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                     Hum2[x],
                 ]
 
@@ -799,12 +802,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         for x in [0, Aligned.shape[1] + 1]:
             if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis(w, x * PeakWidth2ndD / PeakWidth1stD),
+                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
                     Hum2[x],
                 ]
 
