@@ -241,15 +241,28 @@ def load_alignment_points(
     return reference_peaks, target_peaks
 
 
-def reshape_chromatogram_data(data, NbPix):
-    length = len(data)
-    reshaped_data = np.reshape(
-        np.append(
-            data[: (length // NbPix) * NbPix], np.zeros(NbPix - (length % NbPix))
-        ),
-        (NbPix, -1),
-    )
-    return reshaped_data
+def reshape_tic(MStotint, NbPix2ndD):
+    """
+    Reshapes the MStotint array into a 2D array with rows of size NbPix2ndD,
+    padding with zeros if necessary.
+    
+    Parameters:
+        MStotint (numpy.ndarray): Input 1D array of intensities.
+        NbPix2ndD (int): Number of rows for the reshaped array.
+    
+    Returns:
+        numpy.ndarray: Reshaped 2D array.
+    """
+    # Calculate the padding length to make the array divisible by NbPix2ndD
+    pad_length = NbPix2ndD - (len(MStotint) % NbPix2ndD)
+    if pad_length == NbPix2ndD:  # No padding needed
+        pad_length = 0
+    
+    # Pad the array with zeros
+    padded_MStotint = np.pad(MStotint, (0, pad_length), mode='constant')
+    
+    # Reshape the padded array
+    return np.reshape(padded_MStotint, (NbPix2ndD, -1), order='F')
 
 
 def MSdataRound_v2(MSvaluebox, MSintbox, Precision=PRECISION):
@@ -280,18 +293,18 @@ def MSdataRound_v2(MSvaluebox, MSintbox, Precision=PRECISION):
         A[kt, 0] = MSintboxII[kt, 0]
 
         # Counter to track the number of unique m/z values in the row
-        Cnt = 1
+        Cnt = 0
 
         # Loop through the rest of the columns (m/z values in the current chromatogram row)
-        for rr in range(1, MSvalueboxII.shape[1]):
+        for rr in range(MSvalueboxII.shape[1]):
             # If the m/z value already exists in B, add the intensity to A
-            if MSvalueboxII[kt, rr] == B[kt, Cnt - 1]:
-                A[kt, Cnt - 1] += MSintboxII[kt, rr]
+            if MSvalueboxII[kt, rr] == B[kt, Cnt]:
+                A[kt, Cnt] += MSintboxII[kt, rr]
             else:
                 # If not, move to the next position in B and A
                 Cnt += 1
-                B[kt, Cnt - 1] = MSvalueboxII[kt, rr]
-                A[kt, Cnt - 1] = MSintboxII[kt, rr]
+                B[kt, Cnt] = MSvalueboxII[kt, rr]
+                A[kt, Cnt] = MSintboxII[kt, rr]
 
     # Remove trailing zeros in B and A
     MaxNotZero2 = np.max(np.sum(B != 0, axis=1))
@@ -448,8 +461,8 @@ def align_2d_chrom_ms_v5(
     del aligned_indices
 
     # Put the 4 corners interpolated values in the matrices
-    AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox)
-    AlignedMSintboxI = np.concatenate(AlignedMSintbox)
+    AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox, axis=1)
+    AlignedMSintboxI = np.concatenate(AlignedMSintbox, axis=1)
 
     # Remove zeros temporarily by replacing them with the maximum integer value
     AlignedMSvalueboxI[AlignedMSvalueboxI == 0] = np.iinfo(np.int32).max
@@ -733,7 +746,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Y = np.arange(
         -round(Ref.shape[0] / 2),
         Ref.shape[0] + (Ref.shape[0] - round(Ref.shape[0] / 2)),
-    ).reshape(-1, 1) * np.ones((1, Ref.shape[1]))
+    ).reshape(-1, 1) * np.ones((1, Ref.shape[1])) #TODO: check reshape order
 
     Z = np.zeros((Target.shape[0] * 2, Target.shape[1]))
     Z[: int(np.floor(Target.shape[0] / 2)), 1:] = Target[
@@ -753,7 +766,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         values = Z.ravel()
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
         Aligned = griddata(points, values, queries, method=method, fill_value=0)
-        return Aligned.reshape(Xq.shape)
+        return Aligned.reshape(Xq.shape) #TODO: check reshape order
 
     mid_idx = round(Target.shape[0] / 2)
     Xq = X[mid_idx : (mid_idx + Target.shape[0]), :] + Displacement[:, :, 1]
@@ -932,11 +945,14 @@ if __name__ == "__main__":
         ChromatoRef=ChromatoRef,
         ChromatoTarget=ChromatoTarget,
     )
+    #TODO: to remove
+    reference_peaks -= 1
+    target_peaks -= 1
     print("Alignment points loaded successfully.")
 
     print("Reshaping chromatogram data.")
-    target_TIC = reshape_chromatogram_data(ChromatoTarget["MStotint"], NBPIX2NDD_TARGET)
-    ref_TIC = reshape_chromatogram_data(ChromatoRef["MStotint"], NBPIX2NDD_REF)
+    target_TIC = reshape_tic(ChromatoTarget["MStotint"], NBPIX2NDD_TARGET)
+    ref_TIC = reshape_tic(ChromatoRef["MStotint"], NBPIX2NDD_REF)
     print("Chromatogram data reshaped successfully.")
 
     print("Rounding MS data.")
