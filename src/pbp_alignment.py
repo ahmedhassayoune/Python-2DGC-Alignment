@@ -6,11 +6,11 @@ import numpy as np
 from netCDF4 import Dataset  # For reading/writing NetCDF files
 from scipy.interpolate import griddata, interp1d
 
-# TODO: add comment to tell automatic transformation if usink peaks instead of pixels
-# TODO: check if we should close something with netCDF4
-# TODO: handle global parameters in a better way (use dictionary)
-# TODO: implement natural-neighbor interpolation
-# TODO: implement DualSibson model
+#TODO: add comment to tell automatic transformation if using peaks instead of pixels
+#TODO: check if we should close something with netCDF4
+#TODO: handle global parameters in a better way (use dictionary)
+#TODO: implement natural-neighbor interpolation
+#TODO: implement DualSibson model
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -404,7 +404,7 @@ def align_2d_chrom_ms_v5(
         )
 
         # Update pixel counts
-        if ht % NbPix2ndD != 0:
+        if (ht+1) % NbPix2ndD != 0:
             ScndDFlag += 1
         else:
             FrstDFlag += 1
@@ -431,7 +431,7 @@ def align_2d_chrom_ms_v5(
             )
 
             # Update pixel counts
-            if ht % NbPix2ndD != 0:
+            if (ht+1) % NbPix2ndD != 0:
                 ScndDFlag += 1
             else:
                 FrstDFlag += 1
