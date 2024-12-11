@@ -21,7 +21,6 @@ env/
 *.whl
 
 # PyInstaller
-# Usually these files are written by pyinstaller
 dist/
 build/
 *.spec
@@ -52,5 +51,19 @@ dmypy.json
 *.log
 *.log.*
 
-# IDE project files (optional, depending on your IDE)
+# IDE project files
 .idea/
+
+# Additional src folder ignores
+src/__pycache__/
+src/*.py[cod]
+src/*.log
+src/*.egg-info/
+src/*.whl
+src/.ipynb_checkpoints/
+src/.mypy_cache/
+src/.pytest_cache/
+src/build/
+src/dist/
+src/cython_debug/
+src/*.spec
