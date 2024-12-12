@@ -192,12 +192,21 @@ def load_and_merge_csvs(output_dir, ref_filename, dict_chromatos):
         # Add reference chromatogram matrix coordinates to the DataFrame
         rpoints = np.array(df[['rt1', 'rt2']])
         matrix_coord = projection.chromato_to_matrix(rpoints, time_rn=ref_time_rn, mod_time=1.25, chromato_dim=ref_chromato.shape)
-        df.insert(6, 'rp1', matrix_coord[:, 0])
-        df.insert(7, 'rp2', matrix_coord[:, 1])
+        df.insert(7, 'rp1', matrix_coord[:, 0])
+        df.insert(8, 'rp2', matrix_coord[:, 1])
 
     # Concatenate all the DataFrames into one big DataFrame
     merged_df = pd.concat(df_list, ignore_index=True)
 
+    # Sort the DataFrame by descending combined score
+    sim_norm = (merged_df['sim'] - merged_df['sim'].min()) / (merged_df['sim'].max() - merged_df['sim'].min())
+    dist_norm = 1 - (merged_df['dist'] - merged_df['dist'].min()) / (merged_df['dist'].max() - merged_df['dist'].min())
+
+    # Combine the normalized columns into a single score
+    merged_df['combined_score'] = sim_norm + dist_norm
+
+    # Sort by filename and combined score
+    merged_df.sort_values(by=['filename', 'combined_score'], ascending=[True, False], inplace=True)
     return merged_df
 
 def get_mass_range_from_chromatos(chromato_dir):
