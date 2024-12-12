@@ -66,7 +66,7 @@ def open_chromatogram(FileName, Intthreshold=INTTHRESHOLD, driftMS=DRIFTMS):
     # Populate MS data boxes
     for inum in range(pixelnum):
         if abs(eachscannum[inum]) < np.iinfo(np.int32).max:
-            initial = np.sum(eachscannum[:inum]) - eachscannum[inum] + 1
+            initial = np.sum(eachscannum[:inum+1]) - eachscannum[inum]
             acqrange = (
                 np.arange(
                     min(initial, initial + eachscannum[inum] - 1),
