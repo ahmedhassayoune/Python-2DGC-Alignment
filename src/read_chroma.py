@@ -129,7 +129,7 @@ def read_chromato_cube(filename, mod_time=1.25, pre_process=True):
     start_time=time.time()
     chromato_obj = read_chroma(filename, mod_time)
     chromato,time_rn,spectra_obj = chromato_obj
-    print("chromato readed", time.time()-start_time)
+    print("chromato read", time.time()-start_time)
     start_time=time.time()
     full_spectra = mass_spec.read_full_spectra_centroid(spectra_obj=spectra_obj)
     print("full spectra computed", time.time()-start_time)
@@ -179,7 +179,7 @@ def read_chromato_and_chromato_cube(filename, mod_time=1.25, pre_process=True):
     chromato_obj = read_chroma(filename, mod_time)
     chromato,time_rn,spectra_obj = chromato_obj
     (l1, l2, mv, iv, range_min, range_max) = spectra_obj
-    print("chromato readed", time.time()-start_time, 's')
+    print("chromato read", time.time()-start_time, 's')
     start_time=time.time()
     full_spectra = mass_spec.read_full_spectra_centroid(spectra_obj=spectra_obj)
     print("full spectra computed", time.time()-start_time, 's')
