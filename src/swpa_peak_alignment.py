@@ -17,7 +17,7 @@ from peak_detection import peak_detection
 from read_chroma import read_chromato_and_chromato_cube
 
 
-def swpa_peak_alignment(chromato_dir, ref_filename, swpa_input_path):
+def swpa_peak_alignment(chromato_dir, ref_filename, swpa_input_path, mod_time=1.25):
     r"""Aligns chromatogram peaks using SWPA.
     Given a reference chromatogram and a set of target chromatograms,
     aligns the peaks of the target chromatograms with the peaks of the reference chromatogram.
@@ -28,6 +28,10 @@ def swpa_peak_alignment(chromato_dir, ref_filename, swpa_input_path):
         Path to the directory containing the chromatogram files
     ref_filename : str
         Name of the reference chromatogram file.
+    swpa_input_path : str
+        Path to the directory where the SWPA input files will be saved.
+    mod_time : float
+        The modulation time of the chromatograms.
     
     Returns
     -------
@@ -37,12 +41,12 @@ def swpa_peak_alignment(chromato_dir, ref_filename, swpa_input_path):
     dict_chromatos = {}
     
     # Create SWPA input files
-    swpa_input(chromato_dir, swpa_input_path, dict_chromatos)
+    swpa_input(chromato_dir, swpa_input_path, dict_chromatos, mod_time=mod_time)
 
-    matches = run_swpa_script(swpa_input_path, ref_filename, dict_chromatos)
+    matches = run_swpa_script(swpa_input_path, ref_filename, dict_chromatos, mod_time=mod_time)
     return matches
 
-def swpa_input(chromato_dir, swpa_input_path, dict_chromatos, peak_detection_thr=5):
+def swpa_input(chromato_dir, swpa_input_path, dict_chromatos, peak_detection_thr=5, mod_time=1.25):
     """
     Preprocess chromatograms and save them as CSV input files for SWPA script.
 
@@ -56,6 +60,8 @@ def swpa_input(chromato_dir, swpa_input_path, dict_chromatos, peak_detection_thr
         A dictionary to store the chromatogram data for each chromatogram file.
     peak_detection_thr : float
         The threshold for peak detection.
+    mod_time : float
+        The modulation time of the chromatograms.
     """
     
     files = os.listdir(chromato_dir)
@@ -63,7 +69,7 @@ def swpa_input(chromato_dir, swpa_input_path, dict_chromatos, peak_detection_thr
     
     for i, file in enumerate(files):
         # read chromatogram and correct baseline
-        chromato, time_rn, chromato_cube, sigma, mass_range = read_chromato_and_chromato_cube(os.path.join(chromato_dir, file), mod_time=1.25, pre_process=True)
+        chromato, time_rn, chromato_cube, sigma, mass_range = read_chromato_and_chromato_cube(os.path.join(chromato_dir, file), mod_time=mod_time, pre_process=True)
 
         # get basename of file without extension
         basename = file.split('.')[0]
@@ -101,7 +107,7 @@ def swpa_input(chromato_dir, swpa_input_path, dict_chromatos, peak_detection_thr
         print(f"Saved files {i+1}/{len(files)}: {output_file}")
 
 
-def run_swpa_script(swpa_input_path, ref_filename, dict_chromatos):
+def run_swpa_script(swpa_input_path, ref_filename, dict_chromatos, mod_time=1.25):
     """
     Run the SWPA script to align chromatograms.
 
@@ -113,6 +119,8 @@ def run_swpa_script(swpa_input_path, ref_filename, dict_chromatos):
         Name of the reference chromatogram file.
     dict_chromatos : dict
         A dictionary containing the chromatogram data for each chromatogram file.
+    mod_time : float
+        The modulation time of the chromatograms.
     
     Returns:
     -------
@@ -142,11 +150,11 @@ def run_swpa_script(swpa_input_path, ref_filename, dict_chromatos):
     p = subprocess.Popen(['Rscript', swpa_script_path, output_dir, ref] + targets, cwd=base_dir)
     p.wait()
     
-    matches = load_and_merge_csvs(output_dir, ref_filename, dict_chromatos)
+    matches = load_and_merge_csvs(output_dir, ref_filename, dict_chromatos, mod_time=mod_time)
     return matches
     
 
-def load_and_merge_csvs(output_dir, ref_filename, dict_chromatos):
+def load_and_merge_csvs(output_dir, ref_filename, dict_chromatos, mod_time=1.25):
     """
     Load and merge all CSV files in the specified directory.
 
@@ -162,6 +170,8 @@ def load_and_merge_csvs(output_dir, ref_filename, dict_chromatos):
         Name of the reference chromatogram file.
     dict_chromatos : dict
         A dictionary containing the chromatogram data for each chromatogram file.
+    mod_time : float
+        The modulation time of the chromatograms.
 
     Returns:
     -------
@@ -185,13 +195,13 @@ def load_and_merge_csvs(output_dir, ref_filename, dict_chromatos):
 
         # Add target chromatogram matrix coordinates to the DataFrame
         tpoints = np.array(df[['tt1', 'tt2']])
-        matrix_coord = projection.chromato_to_matrix(tpoints, time_rn=time_rn, mod_time=1.25, chromato_dim=chromato.shape)
+        matrix_coord = projection.chromato_to_matrix(tpoints, time_rn=time_rn, mod_time=mod_time, chromato_dim=chromato.shape)
         df.insert(3, 'tp1', matrix_coord[:, 0])
         df.insert(4, 'tp2', matrix_coord[:, 1])
         
         # Add reference chromatogram matrix coordinates to the DataFrame
         rpoints = np.array(df[['rt1', 'rt2']])
-        matrix_coord = projection.chromato_to_matrix(rpoints, time_rn=ref_time_rn, mod_time=1.25, chromato_dim=ref_chromato.shape)
+        matrix_coord = projection.chromato_to_matrix(rpoints, time_rn=ref_time_rn, mod_time=mod_time, chromato_dim=ref_chromato.shape)
         df.insert(7, 'rp1', matrix_coord[:, 0])
         df.insert(8, 'rp2', matrix_coord[:, 1])
 
