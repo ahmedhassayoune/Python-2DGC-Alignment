@@ -258,8 +258,8 @@ def reshape_tic(MStotint, NbPix2ndD):
     if pad_length == NbPix2ndD:  # No padding needed
         pad_length = 0
     
-    # Pad the array with zeros
-    padded_MStotint = np.pad(MStotint, (0, pad_length), mode='constant')
+    # Pad the array with zeros (TODO: remove '+NbPix2ndD')
+    padded_MStotint = np.pad(MStotint, (0, pad_length+NbPix2ndD), mode='constant')
     
     # Reshape the padded array
     return np.reshape(padded_MStotint, (NbPix2ndD, -1), order='F')
@@ -358,7 +358,7 @@ def align_2d_chrom_ms_v5(
     if model_choice == "normal":
         Aligned, Displacement, Deform_output = align_chromato(
             Ref=Ref,
-            Target=Other,
+            Target=np.squeeze(Other),
             Peaks_Ref=Peaks_Ref,
             Peaks_Target=Peaks_Other,
             DisplacementInterpMeth=Interp_meth,
@@ -601,10 +601,10 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     # Initialize Displacement2 array
     Displacement2 = np.zeros((2, 2, 2))
 
-    padding_w_lower = np.floor(0.05 * Aligned.shape[0])
-    padding_w_upper = np.ceil(0.05 * Aligned.shape[0])
-    padding_x_lower = np.floor(0.05 * Aligned.shape[1])
-    padding_x_upper = np.ceil(0.05 * Aligned.shape[1])
+    padding_w_lower = np.floor(0.05 * Aligned.shape[0]+2)
+    padding_w_upper = np.ceil(0.05 * Aligned.shape[0]+1)
+    padding_x_lower = np.floor(0.05 * Aligned.shape[1]+2)
+    padding_x_upper = np.ceil(0.05 * Aligned.shape[1]+1)
 
     # Compute Displacement2 based on the alignment and reference peaks
     # w: 2nd dimension, x: 1st dimension
@@ -724,29 +724,31 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         ],
         kind="linear",
         fill_value="extrapolate",
-    )(np.arange(Target.shape[1]+2))
+    )(np.arange(-1, Target.shape[1]+2))
 
     # Populate the displacement matrix
+    min_x_pksref, max_x_pksref = np.min(Peaks_Ref[:-4, 0]), np.max(Peaks_Ref[:-4, 0])
     for w in range(Aligned.shape[0]):
         for x in range(Aligned.shape[1]):
-            if Aligned[w, x] == 0:
-                if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
-                    Displacement[w, x, :] = [
-                        Fdist1[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
-                        Hum[x],
-                    ]
-                else:
-                    Displacement[w, x, :] = [
-                        Fdist1[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
-                        Hum2[x],
-                    ]
+            if Aligned[w, x] != 0:
+                continue
+            if min_x_pksref <= x <= max_x_pksref:
+                Displacement[w, x, :] = [
+                    Fdist1[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Hum[x],
+                ]
+            else:
+                Displacement[w, x, :] = [
+                    Fdist1[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Hum2[x+1],
+                ]
 
     # Prepare the output grid (X,Y,Z)
     X = np.ones((Ref.shape[0] * 2, 1)) * np.arange(Ref.shape[1])
     Y = np.arange(
         -round(Ref.shape[0] / 2),
         Ref.shape[0] + (Ref.shape[0] - round(Ref.shape[0] / 2)),
-    ).reshape(-1, 1) * np.ones((1, Ref.shape[1])) #TODO: check reshape order
+    ).reshape(-1, 1) * np.ones((1, Ref.shape[1]))
 
     Z = np.zeros((Target.shape[0] * 2, Target.shape[1]))
     Z[: int(np.floor(Target.shape[0] / 2)), 1:] = Target[
@@ -765,12 +767,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         points = np.column_stack((X.ravel(), Y.ravel()))
         values = Z.ravel()
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
-        Aligned = griddata(points, values, queries, method=method, fill_value=0)
-        return Aligned.reshape(Xq.shape) #TODO: check reshape order
+        Aligned = griddata(points, values, queries, method=method, fill_value=np.nan)
+        return Aligned.reshape(Xq.shape)
 
     mid_idx = round(Target.shape[0] / 2)
-    Xq = X[mid_idx : (mid_idx + Target.shape[0]), :] + Displacement[:, :, 1]
-    Yq = Y[mid_idx : (mid_idx + Target.shape[0]), :] + Displacement[:, :, 0]
+    Xq = X[mid_idx : mid_idx + Target.shape[0], :] + Displacement[:, :, 1]
+    Yq = Y[mid_idx : mid_idx + Target.shape[0], :] + Displacement[:, :, 0]
 
     if InterPixelInterpMeth in ["spline", "cubic", "linear"]:
         method = "cubic" if InterPixelInterpMeth == "spline" else InterPixelInterpMeth
@@ -800,27 +802,27 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
 
     for w in [0, Aligned.shape[0] + 1]:
         for x in range(Aligned.shape[1] + 1):
-            if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
+            if min_x_pksref <= x <= max_x_pksref:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum2[x],
                 ]
 
     for w in range(1, Aligned.shape[0]):
         for x in [0, Aligned.shape[1] + 1]:
-            if min(Peaks_Ref[:-4, 0]) <= x <= max(Peaks_Ref[:-4, 0]):
+            if min_x_pksref <= x <= max_x_pksref:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[w, int(x * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum2[x],
                 ]
 
