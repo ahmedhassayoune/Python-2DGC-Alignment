@@ -11,6 +11,7 @@ from scipy.interpolate import griddata, interp1d
 #TODO: handle global parameters in a better way (use dictionary)
 #TODO: implement natural-neighbor interpolation
 #TODO: implement DualSibson model
+#TODO: check all for loops (endVal is included in matlab)
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -672,7 +673,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         -int(padding_x_lower * PeakWidth2ndD / PeakWidth1stD) : int((Aligned.shape[1] + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD),
     ]
 
-    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="cubic")
+    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="nearest")
 
     # TODO: natural-neighbor
     # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
@@ -795,14 +796,18 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     points = np.column_stack(
         (Peaks_Ref[:, 1] + 1, (Peaks_Ref[:, 0] + 1) * PeakWidth2ndD / PeakWidth1stD)
     )
+    gridw, gridx = np.mgrid[
+        -int(padding_w_lower) : Aligned.shape[0] + 2 + int(padding_w_upper),
+        -int(padding_x_lower * PeakWidth2ndD / PeakWidth1stD) : int((Aligned.shape[1] + 2 + padding_x_upper) * PeakWidth2ndD / PeakWidth1stD),
+    ]
     Fdist1bis = griddata(
-        points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="cubic"
+        points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="nearest"
     )
     # TODO: Fdist1bis = naturalneighbor
 
     for w in [0, Aligned.shape[0] + 1]:
-        for x in range(Aligned.shape[1] + 1):
-            if min_x_pksref <= x <= max_x_pksref:
+        for x in range(Aligned.shape[1] + 2):
+            if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
                     Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
@@ -813,9 +818,9 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                     Hum2[x],
                 ]
 
-    for w in range(1, Aligned.shape[0]):
+    for w in range(1, Aligned.shape[0] + 1):
         for x in [0, Aligned.shape[1] + 1]:
-            if min_x_pksref <= x <= max_x_pksref:
+            if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
                     Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
                     Hum[x],
@@ -847,10 +852,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     # Apply deformation correction
     Aligned *= (Deform1 * Deform2) / 4
 
-    SzE = (*Deform1.shape, 2)
-    Deform_output = np.zeros(SzE)
-    Deform_output[:, :, 0] = Deform1
-    Deform_output[:, :, 1] = Deform2
+    Deform_output = np.stack((Deform1, Deform2), axis=-1)
 
     return Aligned, Displacement, Deform_output
 
