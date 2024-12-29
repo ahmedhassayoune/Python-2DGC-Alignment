@@ -1,0 +1,26 @@
+name: python-2dgc-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - molmass
+  - scikit-image
+  - scipy
+  - netCDF4
+  - PyWavelets
+  - matplotlib
+  - scikit-learn
+  - plotly
+  - seaborn
+  - opencv
+  - pybaselines
+  - pyngl
+  - pip
+  - pip:
+      - pyms-nist-search
+      - PyMassSpec
+      - matchms
+      - NistChemPy
