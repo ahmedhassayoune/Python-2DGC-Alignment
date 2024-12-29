@@ -99,7 +99,7 @@ def identification(filename, mod_time=1.25, method='persistent_homology', mode='
     
     chromato, time_rn, chromato_cube, sigma, mass_range=read_chroma.read_chromato_and_chromato_cube(filename, mod_time=mod_time, pre_process=True)
     MIN_SEUIL = seuil * sigma * 100 / np.max(chromato)
-    print("chromato readed")
+    print("chromato read")
     # find 2D peaks
     coordinates = peak_detection.peak_detection((chromato, time_rn, mass_range), None, chromato_cube, MIN_SEUIL, ABS_THRESHOLDS, method=method, mode=mode, cluster=cluster, min_distance=min_distance, sigma_ratio=sigma_ratio, num_sigma=num_sigma)
     print("nb peaks", len(coordinates))
