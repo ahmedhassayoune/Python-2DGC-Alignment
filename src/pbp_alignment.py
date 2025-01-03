@@ -4,7 +4,8 @@ import warnings
 
 import numpy as np
 from netCDF4 import Dataset  # For reading/writing NetCDF files
-from scipy.interpolate import griddata, interp1d
+from scipy.interpolate import interpn, interp1d
+from ngl import natgrid
 
 #TODO: add comment to tell automatic transformation if using peaks instead of pixels
 #TODO: check if we should close something with netCDF4
@@ -439,27 +440,22 @@ def align_2d_chrom_ms_v5(
                 ScndDFlag = 0
 
         # Correct indices and handle out-of-bounds
-        aligned_indices[aligned_indices > np.max(MSpixelsInds)] = 0
-        aligned_indices[aligned_indices < 0] = 0
+        aligned_indices = np.where((aligned_indices > np.max(MSpixelsInds)) | (aligned_indices < 0), np.nan, aligned_indices)
 
         # Populate MS values and intensities
         LpInds = np.arange(len(aligned_indices))
-        LpInds2 = LpInds[aligned_indices != 0]
+        LpInds2 = LpInds[~np.isnan(aligned_indices)]
 
         del LpInds
 
         for ht in LpInds2:
-            MSvaluebox_aligned[ht, :] = MSvaluebox[aligned_indices[ht], :]
-            MSintbox_aligned[ht, :] = (
-                MSintbox[aligned_indices[ht], :]
-                * Interp_dists[ht]
-                * Interp_distu[ht]
-                * Def[ht]
-            )
+            MSvaluebox_aligned[ht, :] = MSvaluebox[int(aligned_indices[ht]), :]
+            MSintbox_aligned[ht, :] = MSintbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, Interp_distr, Interp_dists, Interp_distt, Interp_distu, Def)
+        
+        MSvaluebox_aligned[np.isnan(MSvaluebox_aligned)] = 0
+        MSintbox_aligned[np.isnan(MSintbox_aligned)] = 0        
 
-        del LpInds2
-
-    del aligned_indices
+        del LpInds2, aligned_indices #TODO: fix del of aligned indices
 
     # Put the 4 corners interpolated values in the matrices
     AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox, axis=1)
@@ -470,7 +466,7 @@ def align_2d_chrom_ms_v5(
 
     # Sort the values in ascending order (big values corresponding to zeros go at the end)
     # Sorting by rows
-    IX = np.argsort(AlignedMSvalueboxI, axis=1)
+    IX = np.argsort(AlignedMSvalueboxI, axis=1, kind="stable")
     AlignedMSvalueboxI.sort(axis=1)
 
     # Re-put zeros instead of the big values
@@ -556,6 +552,19 @@ def compute_alignment(
         / 4
     )
     return aligned_index + ht, Def
+
+def compute_intensities_factor(corner, ht, Interp_distr, Interp_dists, Interp_distt, Interp_distu, Def):
+    """
+    Computes the intensity factor for a given corner (a, b, c, or d).
+    """
+    if corner == 0:
+        return Interp_dists[ht] * Interp_distu[ht] * Def[ht]
+    elif corner == 1:
+        return Interp_distr[ht] * Interp_distu[ht] * Def[ht]
+    elif corner == 2:
+        return Interp_dists[ht] * Interp_distt[ht] * Def[ht]
+    else:
+        return Interp_distr[ht] * Interp_distt[ht] * Def[ht]
 
 
 def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
@@ -664,20 +673,13 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         ]
     )
 
-    points = np.column_stack(
-        (Peaks_Ref[:, 1], Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD)
-    )
-
-    gridw, gridx = np.mgrid[
-        -int(padding_w_lower) : Aligned.shape[0] + int(padding_w_upper),
-        -int(padding_x_lower * PeakWidth2ndD / PeakWidth1stD) : int((Aligned.shape[1] + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD),
-    ]
-
-    Fdist1 = griddata(points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="nearest")
-
-    # TODO: natural-neighbor
-    # Perform the natural-neighbor interpolation on 2nd dimension of the displacement
-    # Fdist1 = NearestNDInterpolator(Peaks_Ref[:, [1, 0]] * PeakWidth2ndD / PeakWidth1stD, Peaks_displacement[:, 1], fill_value='extrapolate')
+    natw = Peaks_Ref[:, 1]
+    natx = Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD
+    natv = Peaks_displacement[:, 1]
+    #TODO: fix ranges
+    wo = np.arange(-padding_w_lower, Aligned.shape[0] + padding_w_upper)
+    xo = np.arange(np.round(-padding_x_lower* PeakWidth2ndD / PeakWidth1stD), np.round((Aligned.shape[1] + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD))
+    Fdist1 = natgrid(natw, natx, natv, wo, xo)
 
     Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
     Hep1 = Hep[:, 0]
@@ -735,12 +737,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                 continue
             if min_x_pksref <= x <= max_x_pksref:
                 Displacement[w, x, :] = [
-                    Fdist1[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1[int(w-wo[0]), int(x * PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement[w, x, :] = [
-                    Fdist1[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1[int(w-wo[0]), int(x * PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum2[x+1],
                 ]
 
@@ -764,11 +766,11 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         : int(np.ceil(Target.shape[0] / 2)), 1:
     ]
 
+    #TODO: refactor this part
     def interpolate_2d(X, Y, Z, Xq, Yq, method):
-        points = np.column_stack((X.ravel(), Y.ravel()))
-        values = Z.ravel()
+        points = (X[0, :], Y[:, 0])
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
-        Aligned = griddata(points, values, queries, method=method, fill_value=np.nan)
+        Aligned = interpn(points, Z.T, queries, method=method, fill_value=0)
         return Aligned.reshape(Xq.shape)
 
     mid_idx = round(Target.shape[0] / 2)
@@ -776,12 +778,11 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Yq = Y[mid_idx : mid_idx + Target.shape[0], :] + Displacement[:, :, 0]
 
     if InterPixelInterpMeth in ["spline", "cubic", "linear"]:
-        method = "cubic" if InterPixelInterpMeth == "spline" else InterPixelInterpMeth
+        method = "splinef2d" if InterPixelInterpMeth == "spline" else InterPixelInterpMeth
         Aligned = interpolate_2d(X, Y, Z, Xq, Yq, method)
     else:
         raise ValueError(f"Unsupported interpolation method: {InterPixelInterpMeth}")
 
-    Aligned[np.isnan(Aligned)] = 0
     for k in range(len(Peaks_displacement) - 4):
         Displacement[int(Peaks_Ref[k, 1]), int(Peaks_Ref[k, 0]), :] = Peaks_displacement[k, ::-1]
 
@@ -793,28 +794,24 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
     Displacement_Extended[1:-1, 1:-1, :] = Displacement
 
-    points = np.column_stack(
-        (Peaks_Ref[:, 1] + 1, (Peaks_Ref[:, 0] + 1) * PeakWidth2ndD / PeakWidth1stD)
-    )
-    gridw, gridx = np.mgrid[
-        -int(padding_w_lower) : Aligned.shape[0] + 2 + int(padding_w_upper),
-        -int(padding_x_lower * PeakWidth2ndD / PeakWidth1stD) : int((Aligned.shape[1] + 2 + padding_x_upper) * PeakWidth2ndD / PeakWidth1stD),
-    ]
-    Fdist1bis = griddata(
-        points, values=Peaks_displacement[:, 1], xi=(gridw, gridx), method="nearest"
-    )
-    # TODO: Fdist1bis = naturalneighbor
+    natw, natx = Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * PeakWidth2ndD / PeakWidth1stD
+    natv = Peaks_displacement[:, 1]
+
+    #TODO: fix ranges
+    wo = np.arange(-padding_w_lower, Aligned.shape[0] + 2 + padding_w_upper)
+    xo = np.arange(np.round(-padding_x_lower* PeakWidth2ndD / PeakWidth1stD), np.round((Aligned.shape[1] + 2 + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD))
+    Fdist1bis = natgrid(natw, natx, natv, wo, xo)
 
     for w in [0, Aligned.shape[0] + 1]:
         for x in range(Aligned.shape[1] + 2):
             if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum2[x],
                 ]
 
@@ -822,12 +819,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         for x in [0, Aligned.shape[1] + 1]:
             if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w+padding_w_lower), int((x+padding_x_lower) * PeakWidth2ndD / PeakWidth1stD)],
+                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum2[x],
                 ]
 
