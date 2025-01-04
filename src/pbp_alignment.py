@@ -1,18 +1,21 @@
 import os
 import time
 import warnings
+import gc
 
 import numpy as np
-from netCDF4 import Dataset  # For reading/writing NetCDF files
+from netCDF4 import Dataset
 from scipy.interpolate import interpn, interp1d
 from ngl import natgrid
 
 #TODO: add comment to tell automatic transformation if using peaks instead of pixels
 #TODO: check if we should close something with netCDF4
 #TODO: handle global parameters in a better way (use dictionary)
-#TODO: implement natural-neighbor interpolation
 #TODO: implement DualSibson model
-#TODO: check all for loops (endVal is included in matlab)
+#TODO: test the code with time units
+#TODO: make a separate function to launch the alignment
+#TODO: optimize rounding code
+#TODO: use arrays with float32 if precision is not needed
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -25,7 +28,7 @@ DRIFTMS = 0  # Drift mass spectrum adjustment
 # MODEL CHOICE PARAMETERS
 TYPICAL_PEAK_WIDTH = [1, 5]  # Typical width of a peak in first and second dimension
 MODEL_CHOICE = "normal"  # Model choice ('normal' or 'DualSibson')
-UNITS = "pixel"  # Units for typical peak width and alignment points
+UNITS = "pixel"  # Units for typical peak width and alignment points 'time' or 'pixel'
 
 # I/O PARAMETERS
 OUTPUT_PATH = "/home/ahassayoune/GCxGC-MS-alignment/users/output/"
@@ -333,7 +336,6 @@ def align_2d_chrom_ms_v5(
         MSintbox (np.ndarray): Corresponding intensity values of ions.
         NbPix2ndD (int): Number of pixels per 2nd dimension column.
         kwargs (dict): Optional arguments:
-            - Interp_meth (str): Interpolation method to use.
             - PowerFactor (float): Weighting factor for deformation correction.
             - Peak_widths (list): Expected widths of peaks.
             - InterPixelInterpMeth (str): Method for inter-pixel interpolation.
@@ -351,7 +353,6 @@ def align_2d_chrom_ms_v5(
     """
 
     # Default values for optional arguments
-    Interp_meth = kwargs.get("Interp_meth", "natural-neighbor")
     PowerFactor = kwargs.get("PowerFactor", 2.0)
     Peak_widths = kwargs.get("Peak_widths", [1, 1])
     InterPixelInterpMeth = kwargs.get("InterPixelInterpMeth", "linear")
@@ -363,7 +364,6 @@ def align_2d_chrom_ms_v5(
             Target=np.squeeze(Other),
             Peaks_Ref=Peaks_Ref,
             Peaks_Target=Peaks_Other,
-            DisplacementInterpMeth=Interp_meth,
             PowerFactor=PowerFactor,
             Peak_widths=Peak_widths,
             InterPixelInterpMeth=InterPixelInterpMeth,
@@ -455,7 +455,10 @@ def align_2d_chrom_ms_v5(
         MSvaluebox_aligned[np.isnan(MSvaluebox_aligned)] = 0
         MSintbox_aligned[np.isnan(MSintbox_aligned)] = 0        
 
-        del LpInds2, aligned_indices #TODO: fix del of aligned indices
+        del LpInds2 #TODO: fix del of aligned indices
+    
+    del Defm, AlignedInds, Interp_distr, Interp_dists, Interp_distt, Interp_distu, MSpixelsInds
+    gc.collect()
 
     # Put the 4 corners interpolated values in the matrices
     AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox, axis=1)
@@ -481,9 +484,6 @@ def align_2d_chrom_ms_v5(
     # Remove useless zeros
     AlignedMSvalueboxII = AlignedMSvalueboxI[:, :MaxNotZero]
     AlignedMSintboxII = AlignedMSintboxI[:, :MaxNotZero]
-
-    # Clear variables that are no longer needed
-    del AlignedMSintboxI, AlignedMSvalueboxI
 
     # -- Step 3: For each pixel, only keep each m/z value once, summing corresponding intensity values
     # Initialize matrices for aggregated m/z values and intensities
@@ -577,7 +577,6 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         Peaks_Ref (numpy.ndarray): Positions of alignment points in ref (Nx2 matrix).
         Peaks_Target (numpy.ndarray): Positions of alignment points in target (Nx2 matrix).
         **kwargs: Optional parameters:
-            - 'DisplacementInterpMeth' (str): Interpolation method, default 'natural-neighbor'.
             - 'PowerFactor' (float): Weighting factor for inverse distance, default 2.
             - 'Peak_widths' (list): Typical peak widths [width_1st_dim, width_2nd_dim], default [1, 1].
             - 'InterPixelInterpMeth' (str): Interpolation method for intensity, default 'cubic'.
@@ -588,7 +587,6 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         deform_output (numpy.ndarray): Deformation correction matrix [m, n, 2].
     """
     # Default optional arguments
-    displacement_interp_meth = kwargs.get("DisplacementInterpMeth", "natural-neighbor")
     PowerFactor = kwargs.get("PowerFactor", 2)
     peak_widths = kwargs.get("Peak_widths", [1, 1])
     InterPixelInterpMeth = kwargs.get("InterPixelInterpMeth", "cubic")
@@ -705,7 +703,6 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
             k += 1
         else:
             puet = 1
-
     Hap = np.array(Hap)
 
     # Linear interpolation inside the convex hull
@@ -745,6 +742,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                     Fdist1[int(w-wo[0]), int(x * PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum2[x+1],
                 ]
+    del Fdist1
 
     # Prepare the output grid (X,Y,Z)
     X = np.ones((Ref.shape[0] * 2, 1)) * np.arange(Ref.shape[1])
@@ -782,13 +780,11 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         Aligned = interpolate_2d(X, Y, Z, Xq, Yq, method)
     else:
         raise ValueError(f"Unsupported interpolation method: {InterPixelInterpMeth}")
+    del X, Y, Z, Xq, Yq
+    gc.collect()
 
     for k in range(len(Peaks_displacement) - 4):
         Displacement[int(Peaks_Ref[k, 1]), int(Peaks_Ref[k, 0]), :] = Peaks_displacement[k, ::-1]
-
-    # Initialize deformation arrays
-    Deform1 = np.zeros_like(Aligned)
-    Deform2 = np.zeros_like(Aligned)
 
     # Extend Displacement with borders
     Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
@@ -796,7 +792,6 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
 
     natw, natx = Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * PeakWidth2ndD / PeakWidth1stD
     natv = Peaks_displacement[:, 1]
-
     #TODO: fix ranges
     wo = np.arange(-padding_w_lower, Aligned.shape[0] + 2 + padding_w_upper)
     xo = np.arange(np.round(-padding_x_lower* PeakWidth2ndD / PeakWidth1stD), np.round((Aligned.shape[1] + 2 + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD))
@@ -827,6 +822,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                     Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
                     Hum2[x],
                 ]
+    del Fdist1bis, Hum, Hum2
+    gc.collect()
+
+    # Initialize deformation arrays
+    Deform1 = np.zeros_like(Aligned)
+    Deform2 = np.zeros_like(Aligned)
 
     # Compute Deformation
     for w in range(Aligned.shape[0]):
@@ -955,6 +956,7 @@ if __name__ == "__main__":
     target_TIC = reshape_tic(ChromatoTarget["MStotint"], NBPIX2NDD_TARGET)
     ref_TIC = reshape_tic(ChromatoRef["MStotint"], NBPIX2NDD_REF)
     print("Chromatogram data reshaped successfully.")
+    del ChromatoRef
 
     print("Rounding MS data.")
     time_start = time.time()
@@ -975,6 +977,8 @@ if __name__ == "__main__":
         Peak_widths=TYPICAL_PEAK_WIDTH,
         model_choice=MODEL_CHOICE,
     )
+    del ref_TIC, target_TIC
+    gc.collect()
 
     Alignedeachscannum = np.sum(aligned_result["MSvaluebox"] != 0, axis=1)
     Alignedionid = np.cumsum(Alignedeachscannum)
