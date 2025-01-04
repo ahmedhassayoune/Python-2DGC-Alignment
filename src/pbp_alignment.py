@@ -263,8 +263,7 @@ def reshape_tic(MStotint, NbPix2ndD):
     if pad_length == NbPix2ndD:  # No padding needed
         pad_length = 0
     
-    # Pad the array with zeros (TODO: remove '+NbPix2ndD')
-    padded_MStotint = np.pad(MStotint, (0, pad_length+NbPix2ndD), mode='constant')
+    padded_MStotint = np.pad(MStotint, (0, pad_length), mode='constant')
     
     # Reshape the padded array
     return np.reshape(padded_MStotint, (NbPix2ndD, -1), order='F')
@@ -385,7 +384,6 @@ def align_2d_chrom_ms_v5(
     Interp_dists = np.zeros_like(MSpixelsInds, dtype=float)
     Interp_distt = np.zeros_like(MSpixelsInds, dtype=float)
     Interp_distu = np.zeros_like(MSpixelsInds, dtype=float)
-
     Defm = [np.zeros_like(MSpixelsInds, dtype=float) for _ in range(4)]
 
     # -------------------------
@@ -446,16 +444,12 @@ def align_2d_chrom_ms_v5(
         LpInds = np.arange(len(aligned_indices))
         LpInds2 = LpInds[~np.isnan(aligned_indices)]
 
-        del LpInds
-
         for ht in LpInds2:
             MSvaluebox_aligned[ht, :] = MSvaluebox[int(aligned_indices[ht]), :]
             MSintbox_aligned[ht, :] = MSintbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, Interp_distr, Interp_dists, Interp_distt, Interp_distu, Def)
         
         MSvaluebox_aligned[np.isnan(MSvaluebox_aligned)] = 0
         MSintbox_aligned[np.isnan(MSintbox_aligned)] = 0        
-
-        del LpInds2 #TODO: fix del of aligned indices
     
     del Defm, AlignedInds, Interp_distr, Interp_dists, Interp_distt, Interp_distu, MSpixelsInds
     gc.collect()
@@ -468,7 +462,6 @@ def align_2d_chrom_ms_v5(
     AlignedMSvalueboxI[AlignedMSvalueboxI == 0] = np.iinfo(np.int32).max
 
     # Sort the values in ascending order (big values corresponding to zeros go at the end)
-    # Sorting by rows
     IX = np.argsort(AlignedMSvalueboxI, axis=1, kind="stable")
     AlignedMSvalueboxI.sort(axis=1)
 
@@ -595,8 +588,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Ref, Target = equalize_size(Ref, Target)
 
     # Normalize distances
-    PeakWidth2ndD = peak_widths[1]
-    PeakWidth1stD = peak_widths[0]
+    peak_ratio = peak_widths[1] / peak_widths[0]
 
     # Compute displacement
     Peaks_displacement = Peaks_Target - Peaks_Ref
@@ -606,7 +598,6 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Displacement = np.zeros((Target.shape[0], Target.shape[1], 2))
 
     # -- Compute displacement of peaks and interpolate (1st dim: linear, 2nd dim: natural-neighbor)
-    # Initialize Displacement2 array
     Displacement2 = np.zeros((2, 2, 2))
 
     padding_w_lower = np.floor(0.05 * Aligned.shape[0]+2)
@@ -622,7 +613,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
             Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
             Distance = np.sqrt(
                 Distance_vec[:, 0] ** 2
-                + (Distance_vec[:, 1] * PeakWidth2ndD / PeakWidth1stD) ** 2
+                + (Distance_vec[:, 1] * peak_ratio) ** 2
             )
 
             # Compute the displacement using a weighted mean
@@ -672,11 +663,11 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     )
 
     natw = Peaks_Ref[:, 1]
-    natx = Peaks_Ref[:, 0] * PeakWidth2ndD / PeakWidth1stD
+    natx = Peaks_Ref[:, 0] * peak_ratio
     natv = Peaks_displacement[:, 1]
     #TODO: fix ranges
     wo = np.arange(-padding_w_lower, Aligned.shape[0] + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower* PeakWidth2ndD / PeakWidth1stD), np.round((Aligned.shape[1] + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD))
+    xo = np.arange(np.round(-padding_x_lower* peak_ratio), np.round((Aligned.shape[1] + padding_x_upper)* peak_ratio))
     Fdist1 = natgrid(natw, natx, natv, wo, xo)
 
     Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
@@ -734,12 +725,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                 continue
             if min_x_pksref <= x <= max_x_pksref:
                 Displacement[w, x, :] = [
-                    Fdist1[int(w-wo[0]), int(x * PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1[int(w-wo[0]), int(x * peak_ratio - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement[w, x, :] = [
-                    Fdist1[int(w-wo[0]), int(x * PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1[int(w-wo[0]), int(x * peak_ratio - xo[0])],
                     Hum2[x+1],
                 ]
     del Fdist1
@@ -790,23 +781,23 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
     Displacement_Extended[1:-1, 1:-1, :] = Displacement
 
-    natw, natx = Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * PeakWidth2ndD / PeakWidth1stD
+    natw, natx = Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * peak_ratio
     natv = Peaks_displacement[:, 1]
     #TODO: fix ranges
     wo = np.arange(-padding_w_lower, Aligned.shape[0] + 2 + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower* PeakWidth2ndD / PeakWidth1stD), np.round((Aligned.shape[1] + 2 + padding_x_upper)* PeakWidth2ndD / PeakWidth1stD))
+    xo = np.arange(np.round(-padding_x_lower* peak_ratio), np.round((Aligned.shape[1] + 2 + padding_x_upper)* peak_ratio))
     Fdist1bis = natgrid(natw, natx, natv, wo, xo)
 
     for w in [0, Aligned.shape[0] + 1]:
         for x in range(Aligned.shape[1] + 2):
             if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
                     Hum2[x],
                 ]
 
@@ -814,12 +805,12 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         for x in [0, Aligned.shape[1] + 1]:
             if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
                     Hum[x],
                 ]
             else:
                 Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* PeakWidth2ndD / PeakWidth1stD - xo[0])],
+                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
                     Hum2[x],
                 ]
     del Fdist1bis, Hum, Hum2
