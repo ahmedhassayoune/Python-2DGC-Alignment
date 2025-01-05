@@ -14,12 +14,12 @@ from ngl import natgrid
 #TODO: implement DualSibson model
 #TODO: test the code with time units
 #TODO: make a separate function to launch the alignment
-#TODO: optimize rounding code
 #TODO: use arrays with float32 if precision is not needed
+#TODO: maybe structure all the code in separate files
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
-PRECISION = 0.01  # Precision for rounding of M/S values
+PRECISION = 2  # Decimal precision for m/z values
 INTTHRESHOLD = 0  # Threshold value for signal intensity
 NBPIX2NDD_TARGET = 160  # Number of pixels for 2nd dimension (Target chromatogram)
 NBPIX2NDD_REF = 160  # Number of pixels for 2nd dimension (Reference chromatogram)
@@ -269,55 +269,61 @@ def reshape_tic(MStotint, NbPix2ndD):
     return np.reshape(padded_MStotint, (NbPix2ndD, -1), order='F')
 
 
-def MSdataRound_v2(MSvaluebox, MSintbox, Precision=PRECISION):
+def aggregate_unique_ms_data(mz_values, intensities):
     """
-    Rounds m/z values and combines intensity values for the same m/z in the MS data.
+    Aggregate intensity values corresponding to unique m/z (mass-to-charge) values for each row in a matrix.
 
     Parameters:
-    - MSvaluebox: numpy array of shape (n, m) containing m/z values
-    - MSintbox: numpy array of shape (n, m) containing intensity values corresponding to m/z values
-    - Precision: float, the precision to which the m/z values should be rounded (e.g. 0.001)
+    mz_values (numpy.ndarray): A 2D array where each row contains m/z values for a spectrum.
+    intensities (numpy.ndarray): A 2D array where each row contains intensity values corresponding to the m/z values.
 
     Returns:
-    - MSvalueboxRounded: numpy array of shape (n, k), rounded m/z values
-    - MSintboxRounded: numpy array of shape (n, k), summed intensity values corresponding to the rounded m/z values
+    tuple: Two numpy arrays:
+        - final_mz_values: 2D array with unique m/z values for each row.
+        - final_intensities: 2D array with aggregated intensity values corresponding to the unique m/z values.
+    """
+    unique_mz_values = np.zeros_like(mz_values)
+    aggregated_intensities = np.zeros_like(mz_values)
+
+    for kt in range(mz_values.shape[0]):
+        # Get unique m/z values and their indices
+        unique_mz, indices = np.unique(mz_values[kt, :], return_inverse=True)
+
+        # Aggregate corresponding intensities
+        aggregated_values = np.zeros_like(unique_mz, dtype=intensities.dtype)
+        np.add.at(aggregated_values, indices, intensities[kt, :])
+
+        # Update results in the final arrays
+        unique_mz_values[kt, : len(unique_mz)] = unique_mz
+        aggregated_intensities[kt, : len(unique_mz)] = aggregated_values
+
+    # Remove unnecessary trailing zeros
+    max_nonzero_columns = np.max(np.sum(unique_mz_values != 0, axis=1))
+    final_mz_values = unique_mz_values[:, :max_nonzero_columns]
+    final_intensities = aggregated_intensities[:, :max_nonzero_columns]
+
+    return final_mz_values, final_intensities
+
+
+def round_and_aggregate_unique_ms_data(mz_values, intensities, precision=PRECISION):
+    """
+    Round m/z values to a specified precision and aggregate corresponding intensity values to unique m/z values.
+
+    Parameters:
+    mz_values (numpy.ndarray): A 2D array where each row contains m/z values for a spectrum.
+    intensities (numpy.ndarray): A 2D array where each row contains intensity values corresponding to the m/z values.
+    precision (float): The precision to which the m/z values should be rounded (e.g., 0.001).
+
+    Returns:
+    tuple: Two numpy arrays:
+        - rounded_mz_values: 2D array with unique rounded m/z values for each row.
+        - aggregated_intensities: 2D array with aggregated intensity values corresponding to the rounded m/z values.
     """
     # Round m/z values according to the specified precision
-    MSvalueboxII = np.round(MSvaluebox * (1 / Precision)) * Precision
-    MSintboxII = MSintbox.copy()  # Keep intensity values unchanged
+    rounded_mz_values = np.around(mz_values, decimals=precision)
 
-    # Prepare the output matrices (A for intensities, B for m/z values)
-    A = np.zeros_like(MSvalueboxII)
-    B = np.zeros_like(MSvalueboxII)
-
-    # Loop through each row (each chromatogram)
-    for kt in range(MSvalueboxII.shape[0]):
-        # Initialize the first element in the row
-        B[kt, 0] = MSvalueboxII[kt, 0]
-        A[kt, 0] = MSintboxII[kt, 0]
-
-        # Counter to track the number of unique m/z values in the row
-        Cnt = 0
-
-        # Loop through the rest of the columns (m/z values in the current chromatogram row)
-        for rr in range(MSvalueboxII.shape[1]):
-            # If the m/z value already exists in B, add the intensity to A
-            if MSvalueboxII[kt, rr] == B[kt, Cnt]:
-                A[kt, Cnt] += MSintboxII[kt, rr]
-            else:
-                # If not, move to the next position in B and A
-                Cnt += 1
-                B[kt, Cnt] = MSvalueboxII[kt, rr]
-                A[kt, Cnt] = MSintboxII[kt, rr]
-
-    # Remove trailing zeros in B and A
-    MaxNotZero2 = np.max(np.sum(B != 0, axis=1))
-
-    # Trim the arrays to remove excess zero elements
-    MSvalueboxRounded = B[:, :MaxNotZero2]
-    MSintboxRounded = A[:, :MaxNotZero2]
-
-    return MSvalueboxRounded, MSintboxRounded
+    # Aggregate unique m/z values and their corresponding intensities
+    return aggregate_unique_ms_data(rounded_mz_values, intensities)
 
 
 def align_2d_chrom_ms_v5(
@@ -480,25 +486,9 @@ def align_2d_chrom_ms_v5(
 
     # -- Step 3: For each pixel, only keep each m/z value once, summing corresponding intensity values
     # Initialize matrices for aggregated m/z values and intensities
-    unique_mz_values = np.zeros_like(AlignedMSvalueboxII)
-    aggregated_intensities = np.zeros_like(AlignedMSvalueboxII)
-
-    for kt in range(AlignedMSvalueboxII.shape[0]):
-        # Get unique m/z values and their indices
-        unique_mz, indices = np.unique(AlignedMSvalueboxII[kt, :], return_inverse=True)
-        # Aggregate corresponding intensities
-        aggregated_values = np.zeros_like(unique_mz, dtype=AlignedMSintboxII.dtype)
-        np.add.at(aggregated_values, indices, AlignedMSintboxII[kt, :])
-
-        # Update results in the final arrays
-        unique_mz_values[kt, : len(unique_mz)] = unique_mz
-        aggregated_intensities[kt, : len(unique_mz)] = aggregated_values
-
-    # Remove useless zeros
-    MaxNotZero2 = np.max(np.sum(unique_mz_values != 0, axis=1))
-
-    final_mz_values = unique_mz_values[:, :MaxNotZero2]
-    final_intensities = aggregated_intensities[:, :MaxNotZero2]
+    final_mz_values, final_intensities = aggregate_unique_ms_data(
+        AlignedMSvalueboxII, AlignedMSintboxII
+    )
 
     Alignedeachscannum = np.full(
         (final_intensities.shape[0], 1), final_intensities.shape[1]
@@ -951,7 +941,7 @@ if __name__ == "__main__":
 
     print("Rounding MS data.")
     time_start = time.time()
-    ChromatoTarget["MSvaluebox"], ChromatoTarget["MSintbox"] = MSdataRound_v2(
+    ChromatoTarget["MSvaluebox"], ChromatoTarget["MSintbox"] = round_and_aggregate_unique_ms_data(
         ChromatoTarget["MSvaluebox"], ChromatoTarget["MSintbox"]
     )
     time_end = time.time()
