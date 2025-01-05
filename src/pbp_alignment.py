@@ -3,43 +3,35 @@ import time
 import warnings
 import gc
 
+import json
 import numpy as np
 from netCDF4 import Dataset
 from scipy.interpolate import interpn, interp1d
 from ngl import natgrid
 
+# ---------------------------------------------------------------------
 #TODO: add comment to tell automatic transformation if using peaks instead of pixels
-#TODO: check if we should close something with netCDF4
-#TODO: handle global parameters in a better way (use dictionary)
 #TODO: implement DualSibson model
 #TODO: test the code with time units
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
 #TODO: create notebook to demonstrate the usage of the code
-
-# ---------------------------------------------------------------------
-# INSTRUMENT PARAMETERS
-PRECISION = 2  # Decimal precision for m/z values
-INTTHRESHOLD = 0  # Threshold value for signal intensity
-NBPIX2NDD_TARGET = 160  # Number of pixels for 2nd dimension (Target chromatogram)
-NBPIX2NDD_REF = 160  # Number of pixels for 2nd dimension (Reference chromatogram)
-DRIFTMS = 0  # Drift mass spectrum adjustment
-
-# MODEL CHOICE PARAMETERS
-TYPICAL_PEAK_WIDTH = [1, 5]  # Typical width of a peak in first and second dimension
-MODEL_CHOICE = "normal"  # Model choice ('normal' or 'DualSibson')
-UNITS = "pixel"  # Units for typical peak width and alignment points 'time' or 'pixel'
-
-# I/O PARAMETERS
-OUTPUT_PATH = "/home/ahassayoune/GCxGC-MS-alignment/users/output/"
-INPUT_PATH = "/home/ahassayoune/GCxGC-MS-alignment/users/input/"
-REFERENCE_CHROMATOGRAM_FILE = "Test_reference_chromatogram.cdf"
-TARGET_CHROMATOGRAM_FILE = "Test_target_chromatogram.cdf"
-REFERENCE_ALIGNMENT_PTS_FILE = "Alignment_pts_Reference.csv"
-TARGET_ALIGNMENT_PTS_FILE = "Alignment_pts_Target.csv"
 # ---------------------------------------------------------------------
 
-def open_chromatogram(filename, int_thresh=INTTHRESHOLD, drift_ms=DRIFTMS):
+def load_config(config_path):
+    """
+    Loads the configuration parameters from the specified JSON file.
+    
+    Parameters:
+        config_path (str): Path to the configuration file.
+    
+    Returns:
+        dict: A dictionary containing the configuration parameters.
+    """
+    with open(config_path, "r") as config_file:
+        return json.load(config_file)
+
+def open_chromatogram(filename, int_thresh, drift_ms):
     # Open the CDF file
     with Dataset(filename, "r") as cdf:
         # Retrieve data from the file
@@ -116,7 +108,7 @@ def open_chromatogram(filename, int_thresh=INTTHRESHOLD, drift_ms=DRIFTMS):
     return chromato
 
 
-def load_chromatograms(input_path, target_file, reference_file):
+def load_chromatograms(input_path, target_file, reference_file, int_thresh, drift_ms):
     """
     Loads the target and reference chromatograms from the input path.
     
@@ -124,6 +116,8 @@ def load_chromatograms(input_path, target_file, reference_file):
         input_path (str): Path to the input directory.
         target_file (str): Name of the target chromatogram file.
         reference_file (str): Name of the reference chromatogram file.
+        int_thresh (int): Intensity threshold for filtering.
+        drift_ms (float): Drift time in milliseconds.
     
     Returns:
         tuple: Two dictionaries containing the target and reference chromatograms.
@@ -140,8 +134,8 @@ def load_chromatograms(input_path, target_file, reference_file):
             f"Reference chromatogram file {reference_chromato_path} does not exist."
         )
 
-    chromato_target = open_chromatogram(target_chromato_path)
-    chromato_ref = open_chromatogram(reference_chromato_path)
+    chromato_target = open_chromatogram(target_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms)
+    chromato_ref = open_chromatogram(reference_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms)
 
     return chromato_target, chromato_ref
 
@@ -169,36 +163,30 @@ def time_to_pix(rttime, mod, freq, isot=0):
 
 
 def load_alignment_points(
-    reference_file,
-    target_file,
-    input_path,
-    output_path,
     chromato_ref,
     chromato_target,
-    units=UNITS,
-    nb_pix_2nd_d_ref=NBPIX2NDD_REF,
-    nb_pix_2nd_d_target=NBPIX2NDD_TARGET,
-    typical_peak_width=TYPICAL_PEAK_WIDTH,
+    config
 ):
     """
     Imports and processes alignment points for reference and target chromatograms.
 
     Parameters:
-    - reference_file: str, name of the reference alignment points file
-    - target_file: str, name of the target alignment points file
-    - input_path: str, path to the input directory
-    - output_path: str, path to the output directory
-    - units: str, whether alignment points are in 'time' or 'pixels'
-    - time_to_pix: function to convert time to pixels
-    - nb_pix_2nd_d_ref: number of pixels in the second dimension for the reference
-    - nb_pix_2nd_d_target: number of pixels in the second dimension for the target
     - chromato_ref: chromatogram object with `SamRate` and `RTini` attributes for the reference
     - chromato_target: chromatogram object with `SamRate` and `RTini` attributes for the target
-    - typical_peak_width: typical peak width in time to be converted
+    - config: dictionary containing configuration parameters
 
     Returns:
     - reference_peaks, target_peaks, typical_peak_width: numpy arrays
     """
+    
+    reference_file=config["io_params"]["REFERENCE_ALIGNMENT_PTS_FILE"]
+    target_file=config["io_params"]["TARGET_ALIGNMENT_PTS_FILE"]
+    input_path=config["io_params"]["INPUT_PATH"]
+    output_path=config["io_params"]["OUTPUT_PATH"]
+    units=config["model_choice_params"]["UNITS"]
+    nb_pix_2nd_d_ref=config["instrument_params"]["NBPIX2NDD_REF"]
+    nb_pix_2nd_d_target=config["instrument_params"]["NBPIX2NDD_TARGET"]
+    typical_peak_width=config["model_choice_params"]["TYPICAL_PEAK_WIDTH"]
 
     # Helper function to find and load a file
     def load_file(filename, input_path, output_path):
@@ -250,8 +238,7 @@ def load_alignment_points(
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
-        global TYPICAL_PEAK_WIDTH
-        TYPICAL_PEAK_WIDTH = typical_peak_width
+        config["model_choice_params"]["TYPICAL_PEAK_WIDTH"] = typical_peak_width
 
     return reference_peaks, target_peaks
 
@@ -315,7 +302,7 @@ def aggregate_unique_ms_data(mz_values, intensities):
     return final_mz_values, final_intensities
 
 
-def round_and_aggregate_unique_ms_data(mz_values, intensities, precision=PRECISION):
+def round_and_aggregate_unique_ms_data(mz_values, intensities, precision):
     """
     Round m/z values to a specified precision and aggregate corresponding intensity values to unique m/z values.
 
@@ -329,10 +316,7 @@ def round_and_aggregate_unique_ms_data(mz_values, intensities, precision=PRECISI
         - rounded_mz_values: 2D array with unique rounded m/z values for each row.
         - aggregated_intensities: 2D array with aggregated intensity values corresponding to the rounded m/z values.
     """
-    # Round m/z values according to the specified precision
     rounded_mz_values = np.around(mz_values, decimals=precision)
-
-    # Aggregate unique m/z values and their corresponding intensities
     return aggregate_unique_ms_data(rounded_mz_values, intensities)
 
 
@@ -400,7 +384,7 @@ def align_2d_chrom_ms_v5(
     interp_dists = np.zeros_like(ms_pixels_inds, dtype=float)
     interp_distt = np.zeros_like(ms_pixels_inds, dtype=float)
     interp_distu = np.zeros_like(ms_pixels_inds, dtype=float)
-    defm = [np.zeros_like(ms_pixels_inds, dtype=float) for _ in range(4)]
+    defms = [np.zeros_like(ms_pixels_inds, dtype=float) for _ in range(4)]
 
     # -------------------------
     frst_d_flag, scnd_d_flag = 0, 0
@@ -439,10 +423,10 @@ def align_2d_chrom_ms_v5(
         aligned_indices = aligned_inds[corner]
         msvaluebox_aligned = aligned_msvaluebox[corner]
         msintbox_aligned = aligned_msintbox[corner]
-        def_ = defm[corner]
+        defm = defms[corner]
 
         for ht in range(len(aligned_indices)):
-            aligned_indices[ht], def_[ht] = compute_alignment(
+            aligned_indices[ht], defm[ht] = compute_alignment(
                 ht, displacement, nb_pix_2nd_d, scnd_d_flag, frst_d_flag, deform_output, corner
             )
 
@@ -462,12 +446,12 @@ def align_2d_chrom_ms_v5(
 
         for ht in lp_inds2:
             msvaluebox_aligned[ht, :] = ms_valuebox[int(aligned_indices[ht]), :]
-            msintbox_aligned[ht, :] = ms_intbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, def_)
+            msintbox_aligned[ht, :] = ms_intbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm)
         
         msvaluebox_aligned[np.isnan(msvaluebox_aligned)] = 0
         msintbox_aligned[np.isnan(msintbox_aligned)] = 0        
     
-    del defm, aligned_inds, interp_distr, interp_dists, interp_distt, interp_distu, ms_pixels_inds
+    del defms, aligned_inds, interp_distr, interp_dists, interp_distt, interp_distu, ms_pixels_inds
     gc.collect()
 
     # Put the 4 corners interpolated values in the matrices
@@ -868,6 +852,13 @@ def equalize_size(chromato1, chromato2):
 
 
 def save_chromatogram(filename, chromato_obj):
+    """
+    Save the chromatogram data to a NetCDF file.
+    
+    Parameters:
+        filename (str): Path to the output NetCDF file.
+        chromato_obj (dict): Dictionary containing the chromatogram data.
+    """
     # Flatten the MSvaluebox and MSintbox arrays and remove zeros
     ms_valuebox_line = chromato_obj["MSvaluebox"].T
     ms_intbox_line = chromato_obj["MSintbox"].T
@@ -910,41 +901,47 @@ def save_chromatogram(filename, chromato_obj):
         vardim_h[:] = chromato_obj["MSvalueboxLine"]
         vardim_i[:] = chromato_obj["MSintboxLine"]
 
-def run_chromatogram_alignment():
-    print("Running the main script.")
-    print("Loading chromatograms and alignment points.")
+def run_chromatogram_alignment(config_path):
+    """
+    Main function to run the chromatogram alignment process.
     
+    Parameters:
+        config_path (str): Path to the configuration file.
+    """
+    print("Running the main script.")
+    config = load_config(config_path)
+
+    print("Loading chromatograms and alignment points...")
     chromato_target, chromato_ref = load_chromatograms(
-        input_path=INPUT_PATH,
-        target_file=TARGET_CHROMATOGRAM_FILE,
-        reference_file=REFERENCE_CHROMATOGRAM_FILE,
+        input_path=config["io_params"]["INPUT_PATH"],
+        target_file=config["io_params"]["TARGET_CHROMATOGRAM_FILE"],
+        reference_file=config["io_params"]["REFERENCE_CHROMATOGRAM_FILE"],
+        int_thresh=config["instrument_params"]["INTTHRESHOLD"],
+        drift_ms=config["instrument_params"]["DRIFTMS"]
     )
     print("Chromatograms loaded successfully.")
 
-    print("Loading alignment points.")
+    print("Loading alignment points...")
     reference_peaks, target_peaks = load_alignment_points(
-        reference_file=REFERENCE_ALIGNMENT_PTS_FILE,
-        target_file=TARGET_ALIGNMENT_PTS_FILE,
-        input_path=INPUT_PATH,
-        output_path=OUTPUT_PATH,
         chromato_ref=chromato_ref,
         chromato_target=chromato_target,
+        config=config
     )
     #TODO: to remove
     reference_peaks -= 1
     target_peaks -= 1
     print("Alignment points loaded successfully.")
 
-    print("Reshaping chromatogram data.")
-    target_tic = reshape_tic(chromato_target["MStotint"], NBPIX2NDD_TARGET)
-    ref_tic = reshape_tic(chromato_ref["MStotint"], NBPIX2NDD_REF)
+    print("Reshaping chromatogram data...")
+    target_tic = reshape_tic(chromato_target["MStotint"], config["instrument_params"]["NBPIX2NDD_TARGET"])
+    ref_tic = reshape_tic(chromato_ref["MStotint"], config["instrument_params"]["NBPIX2NDD_REF"])
     print("Chromatogram data reshaped successfully.")
     del chromato_ref
 
-    print("Rounding MS data.")
+    print("Rounding MS data...")
     time_start = time.time()
     chromato_target["MSvaluebox"], chromato_target["MSintbox"] = round_and_aggregate_unique_ms_data(
-        chromato_target["MSvaluebox"], chromato_target["MSintbox"]
+        chromato_target["MSvaluebox"], chromato_target["MSintbox"], precision=config["instrument_params"]["PRECISION"]
     )
     time_end = time.time()
     print("MS data rounded successfully. Time taken:", time_end - time_start)
@@ -956,9 +953,9 @@ def run_chromatogram_alignment():
         peaks_other=target_peaks,
         ms_valuebox=chromato_target["MSvaluebox"],
         ms_intbox=chromato_target["MSintbox"],
-        nb_pix_2nd_d=NBPIX2NDD_REF,
-        peak_widths=TYPICAL_PEAK_WIDTH,
-        model_choice=MODEL_CHOICE,
+        nb_pix_2nd_d=config["instrument_params"]["NBPIX2NDD_REF"],
+        peak_widths=config["model_choice_params"]["TYPICAL_PEAK_WIDTH"],
+        model_choice=config["model_choice_params"]["MODEL_CHOICE"],
     )
     del ref_tic, target_tic
     gc.collect()
@@ -976,13 +973,13 @@ def run_chromatogram_alignment():
     aligned_result["ionid"] = aligned_ion_id
     aligned_result["MStotint"] = aligned_ms_tot_int
 
-    print("Saving aligned chromatogram.")
+    print("Saving aligned chromatogram...")
     output_file_name = os.path.join(
-        OUTPUT_PATH, os.path.splitext(TARGET_CHROMATOGRAM_FILE)[0] + "_ALIGNED.cdf"
+        config["io_params"]["OUTPUT_PATH"], os.path.splitext(config["io_params"]["TARGET_CHROMATOGRAM_FILE"])[0] + "_ALIGNED.cdf"
     )
-
     save_chromatogram(output_file_name, aligned_result)
     print("Aligned chromatogram saved successfully.")
 
 if __name__ == "__main__":
-    run_chromatogram_alignment()
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "pbp_alignment_config.json")
+    run_chromatogram_alignment(config_path)
