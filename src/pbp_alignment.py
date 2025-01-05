@@ -16,7 +16,6 @@ from ngl import natgrid
 #TODO: make a separate function to launch the alignment
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
-#TODO: use snake_case for variable names
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -40,85 +39,95 @@ REFERENCE_ALIGNMENT_PTS_FILE = "Alignment_pts_Reference.csv"
 TARGET_ALIGNMENT_PTS_FILE = "Alignment_pts_Target.csv"
 # ---------------------------------------------------------------------
 
-
-def open_chromatogram(FileName, Intthreshold=INTTHRESHOLD, driftMS=DRIFTMS):
+def open_chromatogram(filename, int_thresh=INTTHRESHOLD, drift_ms=DRIFTMS):
     # Open the CDF file
-    with Dataset(FileName, "r") as cdf:
+    with Dataset(filename, "r") as cdf:
         # Retrieve data from the file
         flag = cdf.variables["flag_count"][:]
-        scantime = cdf.variables["scan_acquisition_time"][:]
-        scannum = cdf.variables["actual_scan_number"][:]
-        medmsmax = cdf.variables["mass_range_max"][:]
-        medmsmin = cdf.variables["mass_range_min"][:]
-        ionid = cdf.variables["scan_index"][:]
-        eachscannum = cdf.variables["point_count"][:]
-        MStotint = cdf.variables["total_intensity"][:]
-        MSvalue = cdf.variables["mass_values"][:] + driftMS
-        MSint = cdf.variables["intensity_values"][:]
+        scan_time = cdf.variables["scan_acquisition_time"][:]
+        scan_num = cdf.variables["actual_scan_number"][:]
+        med_ms_max = cdf.variables["mass_range_max"][:]
+        med_ms_min = cdf.variables["mass_range_min"][:]
+        ion_id = cdf.variables["scan_index"][:]
+        each_scan_num = cdf.variables["point_count"][:]
+        ms_tot_int = cdf.variables["total_intensity"][:]
+        ms_value = cdf.variables["mass_values"][:] + drift_ms
+        ms_int = cdf.variables["intensity_values"][:]
 
     # Compute Time parameters
-    Timepara = scantime[np.abs(eachscannum) < np.iinfo(np.int32).max]
-    RTini = np.min(Timepara) / 60
-    RTruntime = np.max(Timepara) / 60 - RTini
-    SamRate = 1 / np.mean(Timepara[1:] - Timepara[:-1])
+    time_para = scan_time[np.abs(each_scan_num) < np.iinfo(np.int32).max]
+    rt_ini = np.min(time_para) / 60
+    rt_runtime = np.max(time_para) / 60 - rt_ini
+    sam_rate = 1 / np.mean(time_para[1:] - time_para[:-1])
 
     # Initialize data arrays
-    pixelnum = len(scannum)
-    maxscannum = np.max(eachscannum)
-    MSdatabox = np.zeros((pixelnum, maxscannum + 1))
-    MSvaluebox = np.zeros((pixelnum, maxscannum + 1))
-    MSintbox = np.zeros((pixelnum, maxscannum + 1))
+    pixel_num = len(scan_num)
+    max_scan_num = np.max(each_scan_num)
+    ms_data_box = np.zeros((pixel_num, max_scan_num + 1))
+    ms_value_box = np.zeros((pixel_num, max_scan_num + 1))
+    ms_int_box = np.zeros((pixel_num, max_scan_num + 1))
 
     # Populate MS data boxes
-    for inum in range(pixelnum):
-        if abs(eachscannum[inum]) < np.iinfo(np.int32).max:
-            initial = np.sum(eachscannum[:inum+1]) - eachscannum[inum]
-            acqrange = (
+    for i_num in range(pixel_num):
+        if abs(each_scan_num[i_num]) < np.iinfo(np.int32).max:
+            initial = np.sum(each_scan_num[:i_num+1]) - each_scan_num[i_num]
+            acq_range = (
                 np.arange(
-                    min(initial, initial + eachscannum[inum] - 1),
-                    max(initial, initial + eachscannum[inum] - 1) + 1,
+                    min(initial, initial + each_scan_num[i_num] - 1),
+                    max(initial, initial + each_scan_num[i_num] - 1) + 1,
                 )
-                if eachscannum[inum] != 0
+                if each_scan_num[i_num] != 0
                 else []
             )
 
-            remainrep = np.zeros(maxscannum - eachscannum[inum] + 1)
-            MSvaluebox[inum, :] = np.concatenate([MSvalue[acqrange], remainrep])
-            MSintbox[inum, :] = np.concatenate([MSint[acqrange], remainrep])
+            remain_rep = np.zeros(max_scan_num - each_scan_num[i_num] + 1)
+            ms_value_box[i_num, :] = np.concatenate([ms_value[acq_range], remain_rep])
+            ms_int_box[i_num, :] = np.concatenate([ms_int[acq_range], remain_rep])
 
     # Apply intensity threshold
-    MSvaluebox[MSintbox < Intthreshold] = 0
-    MSintbox[MSintbox < Intthreshold] = 0
+    ms_value_box[ms_int_box < int_thresh] = 0
+    ms_int_box[ms_int_box < int_thresh] = 0
 
     # Organize output into a dictionary
-    Chromato = {
+    chromato = {
         "flag": flag,
-        "scantime": scantime,
-        "scannum": scannum,
-        "medmsmax": medmsmax,
-        "medmsmin": medmsmin,
-        "eachscannum": eachscannum,
-        "MStotint": MStotint,
-        "MSvalue": MSvalue,
-        "MSint": MSint,
-        "Timepara": Timepara,
-        "RTini": RTini,
-        "RTruntime": RTruntime,
-        "SamRate": SamRate,
-        "MSthreshold": Intthreshold,
-        "pixelnum": pixelnum,
-        "maxscannum": maxscannum,
-        "minscannum": np.min(eachscannum),
-        "MSdatabox": MSdatabox,
-        "MSvaluebox": MSvaluebox,
-        "MSintbox": MSintbox,
-        "ionid": ionid,
+        "scantime": scan_time,
+        "scannum": scan_num,
+        "medmsmax": med_ms_max,
+        "medmsmin": med_ms_min,
+        "eachscannum": each_scan_num,
+        "MStotint": ms_tot_int,
+        "MSvalue": ms_value,
+        "MSint": ms_int,
+        "Timepara": time_para,
+        "RTini": rt_ini,
+        "RTruntime": rt_runtime,
+        "SamRate": sam_rate,
+        "MSthreshold": int_thresh,
+        "pixelnum": pixel_num,
+        "maxscannum": max_scan_num,
+        "minscannum": np.min(each_scan_num),
+        "MSdatabox": ms_data_box,
+        "MSvaluebox": ms_value_box,
+        "MSintbox": ms_int_box,
+        "ionid": ion_id,
     }
 
-    return Chromato
+    return chromato
 
 
 def load_chromatograms(input_path, target_file, reference_file):
+    """
+    Loads the target and reference chromatograms from the input path.
+    
+    Parameters:
+        input_path (str): Path to the input directory.
+        target_file (str): Name of the target chromatogram file.
+        reference_file (str): Name of the reference chromatogram file.
+    
+    Returns:
+        tuple: Two dictionaries containing the target and reference chromatograms.
+    """
     target_chromato_path = os.path.join(input_path, target_file)
     reference_chromato_path = os.path.join(input_path, reference_file)
 
@@ -131,10 +140,10 @@ def load_chromatograms(input_path, target_file, reference_file):
             f"Reference chromatogram file {reference_chromato_path} does not exist."
         )
 
-    ChromatoTarget = open_chromatogram(target_chromato_path)
-    ChromatoRef = open_chromatogram(reference_chromato_path)
+    chromato_target = open_chromatogram(target_chromato_path)
+    chromato_ref = open_chromatogram(reference_chromato_path)
 
-    return ChromatoTarget, ChromatoRef
+    return chromato_target, chromato_ref
 
 
 def time_to_pix(rttime, mod, freq, isot=0):
@@ -164,11 +173,11 @@ def load_alignment_points(
     target_file,
     input_path,
     output_path,
-    ChromatoRef,
-    ChromatoTarget,
+    chromato_ref,
+    chromato_target,
     units=UNITS,
-    NbPix2ndD_ref=NBPIX2NDD_REF,
-    NbPix2ndD_target=NBPIX2NDD_TARGET,
+    nb_pix_2nd_d_ref=NBPIX2NDD_REF,
+    nb_pix_2nd_d_target=NBPIX2NDD_TARGET,
     typical_peak_width=TYPICAL_PEAK_WIDTH,
 ):
     """
@@ -181,14 +190,14 @@ def load_alignment_points(
     - output_path: str, path to the output directory
     - units: str, whether alignment points are in 'time' or 'pixels'
     - time_to_pix: function to convert time to pixels
-    - NbPix2ndD_ref: number of pixels in the second dimension for the reference
-    - NbPix2ndD_target: number of pixels in the second dimension for the target
-    - ChromatoRef: chromatogram object with `SamRate` and `RTini` attributes for the reference
-    - ChromatoTarget: chromatogram object with `SamRate` and `RTini` attributes for the target
+    - nb_pix_2nd_d_ref: number of pixels in the second dimension for the reference
+    - nb_pix_2nd_d_target: number of pixels in the second dimension for the target
+    - chromato_ref: chromatogram object with `SamRate` and `RTini` attributes for the reference
+    - chromato_target: chromatogram object with `SamRate` and `RTini` attributes for the target
     - typical_peak_width: typical peak width in time to be converted
 
     Returns:
-    - Reference_peaks, Target_peaks, typical_peak_width: numpy arrays
+    - reference_peaks, target_peaks, typical_peak_width: numpy arrays
     """
 
     # Helper function to find and load a file
@@ -225,21 +234,21 @@ def load_alignment_points(
         # Convert time units to pixel units
         target_peaks = time_to_pix(
             target_peaks,
-            NbPix2ndD_target / ChromatoTarget["SamRate"],
-            ChromatoTarget["SamRate"],
-            ChromatoTarget["RTini"],
+            nb_pix_2nd_d_target / chromato_target["SamRate"],
+            chromato_target["SamRate"],
+            chromato_target["RTini"],
         )
         reference_peaks = time_to_pix(
             reference_peaks,
-            NbPix2ndD_ref / ChromatoRef["SamRate"],
-            ChromatoRef["SamRate"],
-            ChromatoRef["RTini"],
+            nb_pix_2nd_d_ref / chromato_ref["SamRate"],
+            chromato_ref["SamRate"],
+            chromato_ref["RTini"],
         )
         typical_peak_width = time_to_pix(
             typical_peak_width,
-            NbPix2ndD_ref / ChromatoRef["SamRate"],
-            ChromatoRef["SamRate"],
-            ChromatoRef["RTini"],
+            nb_pix_2nd_d_ref / chromato_ref["SamRate"],
+            chromato_ref["SamRate"],
+            chromato_ref["RTini"],
         )
         global TYPICAL_PEAK_WIDTH
         TYPICAL_PEAK_WIDTH = typical_peak_width
@@ -247,27 +256,27 @@ def load_alignment_points(
     return reference_peaks, target_peaks
 
 
-def reshape_tic(MStotint, NbPix2ndD):
+def reshape_tic(ms_totint, nb_pix_2nd_d):
     """
-    Reshapes the MStotint array into a 2D array with rows of size NbPix2ndD,
+    Reshapes the ms_totint array into a 2D array with rows of size nb_pix_2nd_d,
     padding with zeros if necessary.
     
     Parameters:
-        MStotint (numpy.ndarray): Input 1D array of intensities.
-        NbPix2ndD (int): Number of rows for the reshaped array.
+        ms_totint (numpy.ndarray): Input 1D array of intensities.
+        nb_pix_2nd_d (int): Number of rows for the reshaped array.
     
     Returns:
         numpy.ndarray: Reshaped 2D array.
     """
-    # Calculate the padding length to make the array divisible by NbPix2ndD
-    pad_length = NbPix2ndD - (len(MStotint) % NbPix2ndD)
-    if pad_length == NbPix2ndD:  # No padding needed
+    # Calculate the padding length to make the array divisible by nb_pix_2nd_d
+    pad_length = nb_pix_2nd_d - (len(ms_totint) % nb_pix_2nd_d)
+    if pad_length == nb_pix_2nd_d:  # No padding needed
         pad_length = 0
     
-    padded_MStotint = np.pad(MStotint, (0, pad_length), mode='constant')
+    padded_ms_totint = np.pad(ms_totint, (0, pad_length), mode='constant')
     
     # Reshape the padded array
-    return np.reshape(padded_MStotint, (NbPix2ndD, -1), order='F')
+    return np.reshape(padded_ms_totint, (nb_pix_2nd_d, -1), order='F')
 
 
 def aggregate_unique_ms_data(mz_values, intensities):
@@ -328,24 +337,24 @@ def round_and_aggregate_unique_ms_data(mz_values, intensities, precision=PRECISI
 
 
 def align_2d_chrom_ms_v5(
-    Ref, Other, Peaks_Ref, Peaks_Other, MSvaluebox, MSintbox, NbPix2ndD, **kwargs
+    ref, other, peaks_ref, peaks_other, ms_valuebox, ms_intbox, nb_pix_2nd_d, **kwargs
 ):
     """
     Aligns 2D chromatograms with MS data.
 
     Parameters:
-        Ref (np.ndarray): Reference chromatogram of size [m, n].
-        Other (np.ndarray): Target chromatogram of size [m, n].
-        Peaks_Ref (np.ndarray): Alignment points in the reference chromatogram.
-        Peaks_Other (np.ndarray): Alignment points in the target chromatogram.
-        MSvaluebox (np.ndarray): m/z values of ions.
-        MSintbox (np.ndarray): Corresponding intensity values of ions.
-        NbPix2ndD (int): Number of pixels per 2nd dimension column.
+        ref (np.ndarray): Reference chromatogram of size [m, n].
+        other (np.ndarray): Target chromatogram of size [m, n].
+        peaks_ref (np.ndarray): Alignment points in the reference chromatogram.
+        peaks_other (np.ndarray): Alignment points in the target chromatogram.
+        ms_valuebox (np.ndarray): m/z values of ions.
+        ms_intbox (np.ndarray): Corresponding intensity values of ions.
+        nb_pix_2nd_d (int): Number of pixels per 2nd dimension column.
         kwargs (dict): Optional arguments:
-            - PowerFactor (float): Weighting factor for deformation correction.
-            - Peak_widths (list): Expected widths of peaks.
-            - InterPixelInterpMeth (str): Method for inter-pixel interpolation.
-            - model_choice (str): Choice of model for alignment: 'normal' or 'DualSibson'.
+            - 'power_factor' (float): Weighting factor for deformation correction.
+            - 'peak_widths' (list): Expected widths of peaks.
+            - 'inter_pixel_interp_meth' (str): Method for inter-pixel interpolation.
+            - 'model_choice' (str): Choice of model for alignment: 'normal' or 'DualSibson'.
 
     Returns:
         dict: A dictionary containing alignment results:
@@ -359,211 +368,210 @@ def align_2d_chrom_ms_v5(
     """
 
     # Default values for optional arguments
-    PowerFactor = kwargs.get("PowerFactor", 2.0)
-    Peak_widths = kwargs.get("Peak_widths", [1, 1])
-    InterPixelInterpMeth = kwargs.get("InterPixelInterpMeth", "linear")
+    power_factor = kwargs.get("power_factor", 2.0)
+    peak_widths = kwargs.get("peak_widths", [1, 1])
+    inter_pixel_interp_meth = kwargs.get("inter_pixel_interp_meth", "linear")
     model_choice = kwargs.get("model_choice", "normal")
 
     if model_choice == "normal":
-        Aligned, Displacement, Deform_output = align_chromato(
-            Ref=Ref,
-            Target=np.squeeze(Other),
-            Peaks_Ref=Peaks_Ref,
-            Peaks_Target=Peaks_Other,
-            PowerFactor=PowerFactor,
-            Peak_widths=Peak_widths,
-            InterPixelInterpMeth=InterPixelInterpMeth,
+        aligned, displacement, deform_output = align_chromato(
+            ref=ref,
+            target=np.squeeze(other),
+            peaks_ref=peaks_ref,
+            peaks_target=peaks_other,
+            power_factor=power_factor,
+            peak_widths=peak_widths,
+            inter_pixel_interp_meth=inter_pixel_interp_meth,
         )
     elif model_choice == "DualSibson":
         # TODO: implement DualSibson model
-        # Aligned, Displacement, Deform_output = (
+        # aligned, displacement, deform_output = (
         #     alignChromato_with_SibsonInterp_also_1stD()
         # )
         pass
     else:
         raise ValueError(f"Invalid model choice: {model_choice}.")
 
-    MSpixelsInds = np.arange(MSvaluebox.shape[0])
-    AlignedInds = [np.zeros_like(MSpixelsInds) for _ in range(4)]
-    AlignedMSvaluebox = [np.zeros_like(MSvaluebox) for _ in range(4)]
-    AlignedMSintbox = [np.zeros_like(MSintbox) for _ in range(4)]
-    Interp_distr = np.zeros_like(MSpixelsInds, dtype=float)
-    Interp_dists = np.zeros_like(MSpixelsInds, dtype=float)
-    Interp_distt = np.zeros_like(MSpixelsInds, dtype=float)
-    Interp_distu = np.zeros_like(MSpixelsInds, dtype=float)
-    Defm = [np.zeros_like(MSpixelsInds, dtype=float) for _ in range(4)]
+    ms_pixels_inds = np.arange(ms_valuebox.shape[0])
+    aligned_inds = [np.zeros_like(ms_pixels_inds) for _ in range(4)]
+    aligned_msvaluebox = [np.zeros_like(ms_valuebox) for _ in range(4)]
+    aligned_msintbox = [np.zeros_like(ms_intbox) for _ in range(4)]
+    interp_distr = np.zeros_like(ms_pixels_inds, dtype=float)
+    interp_dists = np.zeros_like(ms_pixels_inds, dtype=float)
+    interp_distt = np.zeros_like(ms_pixels_inds, dtype=float)
+    interp_distu = np.zeros_like(ms_pixels_inds, dtype=float)
+    defm = [np.zeros_like(ms_pixels_inds, dtype=float) for _ in range(4)]
 
     # -------------------------
-    FrstDFlag, ScndDFlag = 0, 0
-    for ht in range(len(AlignedInds[0])):
+    frst_d_flag, scnd_d_flag = 0, 0
+    for ht in range(len(aligned_inds[0])):
         # Compute r, s, t, u for interpolation
-        Interp_distr[ht] = Displacement[ScndDFlag, FrstDFlag, 1] - np.floor(
-            Displacement[ScndDFlag, FrstDFlag, 1]
+        interp_distr[ht] = displacement[scnd_d_flag, frst_d_flag, 1] - np.floor(
+            displacement[scnd_d_flag, frst_d_flag, 1]
         )
-        Interp_dists[ht] = -Displacement[ScndDFlag, FrstDFlag, 1] + np.ceil(
-            Displacement[ScndDFlag, FrstDFlag, 1]
+        interp_dists[ht] = -displacement[scnd_d_flag, frst_d_flag, 1] + np.ceil(
+            displacement[scnd_d_flag, frst_d_flag, 1]
         )
-        Interp_distt[ht] = Displacement[ScndDFlag, FrstDFlag, 0] - np.floor(
-            Displacement[ScndDFlag, FrstDFlag, 0]
+        interp_distt[ht] = displacement[scnd_d_flag, frst_d_flag, 0] - np.floor(
+            displacement[scnd_d_flag, frst_d_flag, 0]
         )
-        Interp_distu[ht] = -Displacement[ScndDFlag, FrstDFlag, 0] + np.ceil(
-            Displacement[ScndDFlag, FrstDFlag, 0]
+        interp_distu[ht] = -displacement[scnd_d_flag, frst_d_flag, 0] + np.ceil(
+            displacement[scnd_d_flag, frst_d_flag, 0]
         )
 
         # Update pixel counts
-        if (ht+1) % NbPix2ndD != 0:
-            ScndDFlag += 1
+        if (ht+1) % nb_pix_2nd_d != 0:
+            scnd_d_flag += 1
         else:
-            FrstDFlag += 1
-            ScndDFlag = 0
+            frst_d_flag += 1
+            scnd_d_flag = 0
 
     # Correct indices that are outside the chromatogram
-    Interp_distr[Interp_distr == 0] = 0.5
-    Interp_dists[Interp_dists == 0] = 0.5
-    Interp_distt[Interp_distt == 0] = 0.5
-    Interp_distu[Interp_distu == 0] = 0.5
+    interp_distr[interp_distr == 0] = 0.5
+    interp_dists[interp_dists == 0] = 0.5
+    interp_distt[interp_distt == 0] = 0.5
+    interp_distu[interp_distu == 0] = 0.5
     # -------------------------
 
     # Process for each corner (a, b, c, d)
     for corner in range(4):
-        FrstDFlag, ScndDFlag = 0, 0
-        aligned_indices = AlignedInds[corner]
-        MSvaluebox_aligned = AlignedMSvaluebox[corner]
-        MSintbox_aligned = AlignedMSintbox[corner]
-        Def = Defm[corner]
+        frst_d_flag, scnd_d_flag = 0, 0
+        aligned_indices = aligned_inds[corner]
+        msvaluebox_aligned = aligned_msvaluebox[corner]
+        msintbox_aligned = aligned_msintbox[corner]
+        def_ = defm[corner]
 
         for ht in range(len(aligned_indices)):
-            aligned_indices[ht], Def[ht] = compute_alignment(
-                ht, Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
+            aligned_indices[ht], def_[ht] = compute_alignment(
+                ht, displacement, nb_pix_2nd_d, scnd_d_flag, frst_d_flag, deform_output, corner
             )
 
             # Update pixel counts
-            if (ht+1) % NbPix2ndD != 0:
-                ScndDFlag += 1
+            if (ht+1) % nb_pix_2nd_d != 0:
+                scnd_d_flag += 1
             else:
-                FrstDFlag += 1
-                ScndDFlag = 0
+                frst_d_flag += 1
+                scnd_d_flag = 0
 
         # Correct indices and handle out-of-bounds
-        aligned_indices = np.where((aligned_indices > np.max(MSpixelsInds)) | (aligned_indices < 0), np.nan, aligned_indices)
+        aligned_indices = np.where((aligned_indices > np.max(ms_pixels_inds)) | (aligned_indices < 0), np.nan, aligned_indices)
 
         # Populate MS values and intensities
-        LpInds = np.arange(len(aligned_indices))
-        LpInds2 = LpInds[~np.isnan(aligned_indices)]
+        lp_inds = np.arange(len(aligned_indices))
+        lp_inds2 = lp_inds[~np.isnan(aligned_indices)]
 
-        for ht in LpInds2:
-            MSvaluebox_aligned[ht, :] = MSvaluebox[int(aligned_indices[ht]), :]
-            MSintbox_aligned[ht, :] = MSintbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, Interp_distr, Interp_dists, Interp_distt, Interp_distu, Def)
+        for ht in lp_inds2:
+            msvaluebox_aligned[ht, :] = ms_valuebox[int(aligned_indices[ht]), :]
+            msintbox_aligned[ht, :] = ms_intbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, def_)
         
-        MSvaluebox_aligned[np.isnan(MSvaluebox_aligned)] = 0
-        MSintbox_aligned[np.isnan(MSintbox_aligned)] = 0        
+        msvaluebox_aligned[np.isnan(msvaluebox_aligned)] = 0
+        msintbox_aligned[np.isnan(msintbox_aligned)] = 0        
     
-    del Defm, AlignedInds, Interp_distr, Interp_dists, Interp_distt, Interp_distu, MSpixelsInds
+    del defm, aligned_inds, interp_distr, interp_dists, interp_distt, interp_distu, ms_pixels_inds
     gc.collect()
 
     # Put the 4 corners interpolated values in the matrices
-    AlignedMSvalueboxI = np.concatenate(AlignedMSvaluebox, axis=1)
-    AlignedMSintboxI = np.concatenate(AlignedMSintbox, axis=1)
+    aligned_msvaluebox_i = np.concatenate(aligned_msvaluebox, axis=1)
+    aligned_msintbox_i = np.concatenate(aligned_msintbox, axis=1)
 
     # Remove zeros temporarily by replacing them with the maximum integer value
-    AlignedMSvalueboxI[AlignedMSvalueboxI == 0] = np.iinfo(np.int32).max
+    aligned_msvaluebox_i[aligned_msvaluebox_i == 0] = np.iinfo(np.int32).max
 
     # Sort the values in ascending order (big values corresponding to zeros go at the end)
-    IX = np.argsort(AlignedMSvalueboxI, axis=1, kind="stable")
-    AlignedMSvalueboxI.sort(axis=1)
+    ix = np.argsort(aligned_msvaluebox_i, axis=1, kind="stable")
+    aligned_msvaluebox_i.sort(axis=1)
 
     # Re-put zeros instead of the big values
-    AlignedMSvalueboxI[AlignedMSvalueboxI == np.iinfo(np.int32).max] = 0
+    aligned_msvaluebox_i[aligned_msvaluebox_i == np.iinfo(np.int32).max] = 0
 
-    # Put the values in AlignedMSintboxI in the corresponding order
-    AlignedMSintboxI = np.take_along_axis(AlignedMSintboxI, IX, axis=1)
+    # Put the values in aligned_msintbox_i in the corresponding order
+    aligned_msintbox_i = np.take_along_axis(aligned_msintbox_i, ix, axis=1)
 
     # Find the max of non-zero values (to remove useless zeros)
-    MaxNotZero = np.max(np.sum(AlignedMSintboxI != 0, axis=1))
+    max_not_zero = np.max(np.sum(aligned_msintbox_i != 0, axis=1))
 
     # Remove useless zeros
-    AlignedMSvalueboxII = AlignedMSvalueboxI[:, :MaxNotZero]
-    AlignedMSintboxII = AlignedMSintboxI[:, :MaxNotZero]
+    aligned_msvaluebox_ii = aligned_msvaluebox_i[:, :max_not_zero]
+    aligned_msintbox_ii = aligned_msintbox_i[:, :max_not_zero]
 
     # -- Step 3: For each pixel, only keep each m/z value once, summing corresponding intensity values
     # Initialize matrices for aggregated m/z values and intensities
     final_mz_values, final_intensities = aggregate_unique_ms_data(
-        AlignedMSvalueboxII, AlignedMSintboxII
+        aligned_msvaluebox_ii, aligned_msintbox_ii
     )
 
-    Alignedeachscannum = np.full(
+    aligned_each_scan_num = np.full(
         (final_intensities.shape[0], 1), final_intensities.shape[1]
     )
-    Alignedmedionid = np.cumsum(Alignedeachscannum)
+    aligned_medion_id = np.cumsum(aligned_each_scan_num)
 
     return {
         "MSvaluebox": final_mz_values,
         "MSintbox": final_intensities,
-        "eachscannum": Alignedeachscannum,
-        "ionid": Alignedmedionid,
-        "Aligned": Aligned,
-        "Displacement": Displacement,
-        "Deform_output": Deform_output,
+        "eachscannum": aligned_each_scan_num,
+        "ionid": aligned_medion_id,
+        "Aligned": aligned,
+        "Displacement": displacement,
+        "Deform_output": deform_output,
     }
 
-
 def compute_alignment(
-    ht, Displacement, NbPix2ndD, ScndDFlag, FrstDFlag, Deform_output, corner
+    ht, displacement, nb_pix_2nd_d, scnd_d_flag, frst_d_flag, deform_output, corner
 ):
     """
     Computes the alignment for a given corner (a, b, c, or d).
     """
     if corner == 0:  # Corner a (floor-floor)
         aligned_index = np.floor(
-            Displacement[ScndDFlag, FrstDFlag, 0]
-        ) + NbPix2ndD * np.floor(Displacement[ScndDFlag, FrstDFlag, 1])
+            displacement[scnd_d_flag, frst_d_flag, 0]
+        ) + nb_pix_2nd_d * np.floor(displacement[scnd_d_flag, frst_d_flag, 1])
     elif corner == 1:  # Corner b (ceil-floor)
         aligned_index = np.floor(
-            Displacement[ScndDFlag, FrstDFlag, 0]
-        ) + NbPix2ndD * np.ceil(Displacement[ScndDFlag, FrstDFlag, 1])
+            displacement[scnd_d_flag, frst_d_flag, 0]
+        ) + nb_pix_2nd_d * np.ceil(displacement[scnd_d_flag, frst_d_flag, 1])
     elif corner == 2:  # Corner c (floor-ceil)
         aligned_index = np.ceil(
-            Displacement[ScndDFlag, FrstDFlag, 0]
-        ) + NbPix2ndD * np.floor(Displacement[ScndDFlag, FrstDFlag, 1])
+            displacement[scnd_d_flag, frst_d_flag, 0]
+        ) + nb_pix_2nd_d * np.floor(displacement[scnd_d_flag, frst_d_flag, 1])
     else:  # Corner d (ceil-ceil)
         aligned_index = np.ceil(
-            Displacement[ScndDFlag, FrstDFlag, 0]
-        ) + NbPix2ndD * np.ceil(Displacement[ScndDFlag, FrstDFlag, 1])
+            displacement[scnd_d_flag, frst_d_flag, 0]
+        ) + nb_pix_2nd_d * np.ceil(displacement[scnd_d_flag, frst_d_flag, 1])
 
-    Def = (
-        Deform_output[ScndDFlag, FrstDFlag, 0]
-        * Deform_output[ScndDFlag, FrstDFlag, 1]
+    defm = (
+        deform_output[scnd_d_flag, frst_d_flag, 0]
+        * deform_output[scnd_d_flag, frst_d_flag, 1]
         / 4
     )
-    return aligned_index + ht, Def
+    return aligned_index + ht, defm
 
-def compute_intensities_factor(corner, ht, Interp_distr, Interp_dists, Interp_distt, Interp_distu, Def):
+def compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm):
     """
     Computes the intensity factor for a given corner (a, b, c, or d).
     """
     if corner == 0:
-        return Interp_dists[ht] * Interp_distu[ht] * Def[ht]
+        return interp_dists[ht] * interp_distu[ht] * defm[ht]
     elif corner == 1:
-        return Interp_distr[ht] * Interp_distu[ht] * Def[ht]
+        return interp_distr[ht] * interp_distu[ht] * defm[ht]
     elif corner == 2:
-        return Interp_dists[ht] * Interp_distt[ht] * Def[ht]
+        return interp_dists[ht] * interp_distt[ht] * defm[ht]
     else:
-        return Interp_distr[ht] * Interp_distt[ht] * Def[ht]
+        return interp_distr[ht] * interp_distt[ht] * defm[ht]
 
 
-def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
+def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
     """
     Aligns the target chromatogram to the reference chromatogram.
 
     Parameters:
         ref (numpy.ndarray): Reference chromatogram (2D matrix).
         target (numpy.ndarray): Target chromatogram (2D matrix).
-        Peaks_Ref (numpy.ndarray): Positions of alignment points in ref (Nx2 matrix).
-        Peaks_Target (numpy.ndarray): Positions of alignment points in target (Nx2 matrix).
+        peaks_ref (numpy.ndarray): Positions of alignment points in ref (Nx2 matrix).
+        peaks_target (numpy.ndarray): Positions of alignment points in target (Nx2 matrix).
         **kwargs: Optional parameters:
-            - 'PowerFactor' (float): Weighting factor for inverse distance, default 2.
-            - 'Peak_widths' (list): Typical peak widths [width_1st_dim, width_2nd_dim], default [1, 1].
-            - 'InterPixelInterpMeth' (str): Interpolation method for intensity, default 'cubic'.
+            - 'power_factor' (float): Weighting factor for inverse distance, default 2.
+            - 'peak_widths' (list): Typical peak widths [width_1st_dim, width_2nd_dim], default [1, 1].
+            - 'inter_pixel_interp_meth' (str): Interpolation method for intensity, default 'cubic'.
 
     Returns:
         aligned (numpy.ndarray): Aligned chromatogram.
@@ -571,67 +579,67 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         deform_output (numpy.ndarray): Deformation correction matrix [m, n, 2].
     """
     # Default optional arguments
-    PowerFactor = kwargs.get("PowerFactor", 2)
-    peak_widths = kwargs.get("Peak_widths", [1, 1])
-    InterPixelInterpMeth = kwargs.get("InterPixelInterpMeth", "cubic")
+    power_factor = kwargs.get("power_factor", 2)
+    peak_widths = kwargs.get("peak_widths", [1, 1])
+    inter_pixel_interp_meth = kwargs.get("inter_pixel_interp_meth", "cubic")
 
     # Ensure ref and target have the same size
-    Ref, Target = equalize_size(Ref, Target)
+    ref, target = equalize_size(ref, target)
 
     # Compute the peak ratio to normalize distances
     peak_ratio = peak_widths[1] / peak_widths[0]
 
     # Compute displacement
-    Peaks_displacement = Peaks_Target - Peaks_Ref
+    peaks_displacement = peaks_target - peaks_ref
 
     # Initialize output arrays
-    Aligned = np.zeros_like(Target)
-    Displacement = np.zeros((Target.shape[0], Target.shape[1], 2))
+    aligned = np.zeros_like(target)
+    displacement = np.zeros((target.shape[0], target.shape[1], 2))
 
     # -- Compute displacement of peaks and interpolate (1st dim: linear, 2nd dim: natural-neighbor)
-    Displacement2 = np.zeros((2, 2, 2))
+    displacement2 = np.zeros((2, 2, 2))
 
-    padding_w_lower = np.floor(0.05 * Aligned.shape[0]+2)
-    padding_w_upper = np.ceil(0.05 * Aligned.shape[0]+1)
-    padding_x_lower = np.floor(0.05 * Aligned.shape[1]+2)
-    padding_x_upper = np.ceil(0.05 * Aligned.shape[1]+1)
+    padding_w_lower = np.floor(0.05 * aligned.shape[0] + 2)
+    padding_w_upper = np.ceil(0.05 * aligned.shape[0] + 1)
+    padding_x_lower = np.floor(0.05 * aligned.shape[1] + 2)
+    padding_x_upper = np.ceil(0.05 * aligned.shape[1] + 1)
 
-    # Compute Displacement2 based on the alignment and reference peaks
+    # Compute displacement2 based on the alignment and reference peaks
     # w: 2nd dimension, x: 1st dimension
-    for w in (-padding_w_lower, Aligned.shape[0] + padding_w_upper):
-        for x in (-padding_x_lower, Aligned.shape[1] + padding_x_upper):
+    for w in (-padding_w_lower, aligned.shape[0] + padding_w_upper):
+        for x in (-padding_x_lower, aligned.shape[1] + padding_x_upper):
             # Compute the distance vector for the pixel
-            Distance_vec = np.array([w, x]) - np.flip(Peaks_Ref, axis=1)
-            Distance = np.sqrt(
-                Distance_vec[:, 0] ** 2
-                + (Distance_vec[:, 1] * peak_ratio) ** 2
+            distance_vec = np.array([w, x]) - np.flip(peaks_ref, axis=1)
+            distance = np.sqrt(
+                distance_vec[:, 0] ** 2
+                + (distance_vec[:, 1] * peak_ratio) ** 2
             )
 
             # Compute the displacement using a weighted mean
-            weight = 1 / (Distance**PowerFactor)
+            weight = 1 / (distance**power_factor)
             d2w = (w + int(padding_w_lower)) // (
-                Aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper)
+                aligned.shape[0] + int(padding_w_lower) + int(padding_w_upper)
             )
             d2x = (x + int(padding_x_lower)) // (
-                Aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper)
+                aligned.shape[1] + int(padding_x_lower) + int(padding_x_upper)
             )
-            Displacement2[int(d2w), int(d2x), :] = np.sum(
-                np.flip(Peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0
+            displacement2[int(d2w), int(d2x), :] = np.sum(
+                np.flip(peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0
             ) / np.sum(weight)
 
     # Add a peak at each corner (around the chromatogram with an offset)
-    Peaks_Ref = np.vstack(
+    peaks_ref_corner = np.vstack(
         [
-            Peaks_Ref,
+            peaks_ref,
             # base corners with offsets
             np.array(
                 [
                     [-padding_x_lower, -padding_w_lower],
-                    [-padding_x_lower, Aligned.shape[0] + padding_w_upper],
-                    [Aligned.shape[1] + padding_x_upper, -padding_w_lower],
+                    [-padding_x_lower, aligned.shape[0] + padding_w_upper],
+                    [aligned.shape[1] + padding_x_upper, -padding_w_lower],
                     [
-                        Aligned.shape[1] + padding_x_upper,
-                        Aligned.shape[0] + padding_w_upper,
+                        aligned.shape[1] + padding_x_upper,
+                        aligned.shape[0] + padding_w_upper,
                     ],
                 ]
             ),
@@ -639,92 +647,92 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     )
 
     # Add corresponding displacement values for the added peaks
-    Peaks_displacement = np.vstack(
+    peaks_displacement_corner = np.vstack(
         [
-            Peaks_displacement,
+            peaks_displacement,
             np.array(
                 [
-                    [Displacement2[0, 0, 1], Displacement2[0, 0, 0]],
-                    [Displacement2[1, 0, 1], Displacement2[1, 0, 0]],
-                    [Displacement2[0, 1, 1], Displacement2[0, 1, 0]],
-                    [Displacement2[1, 1, 1], Displacement2[1, 1, 0]],
+                    [displacement2[0, 0, 1], displacement2[0, 0, 0]],
+                    [displacement2[1, 0, 1], displacement2[1, 0, 0]],
+                    [displacement2[0, 1, 1], displacement2[0, 1, 0]],
+                    [displacement2[1, 1, 1], displacement2[1, 1, 0]],
                 ]
             ),
         ]
     )
 
-    natw = Peaks_Ref[:, 1]
-    natx = Peaks_Ref[:, 0] * peak_ratio
-    natv = Peaks_displacement[:, 1]
+    natw = peaks_ref_corner[:, 1]
+    natx = peaks_ref_corner[:, 0] * peak_ratio
+    natv = peaks_displacement_corner[:, 1]
     #TODO: fix ranges
-    wo = np.arange(-padding_w_lower, Aligned.shape[0] + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower* peak_ratio), np.round((Aligned.shape[1] + padding_x_upper)* peak_ratio))
-    Fdist1 = natgrid(natw, natx, natv, wo, xo)
+    wo = np.arange(-padding_w_lower, aligned.shape[0] + padding_w_upper)
+    xo = np.arange(np.round(-padding_x_lower * peak_ratio), np.round((aligned.shape[1] + padding_x_upper) * peak_ratio))
+    fdist1 = natgrid(natw, natx, natv, wo, xo)
 
-    Hep = np.vstack([Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]]).T
-    Hep1 = Hep[:, 0]
-    Hep2 = Hep[:, 1]
-    Herp = []
+    hep = np.vstack([peaks_ref[:, 0], peaks_displacement[:, 0]]).T
+    hep1 = hep[:, 0]
+    hep2 = hep[:, 1]
+    herp = []
 
-    for hHh in range(len(Hep)):
-        Herp.append([Hep1[hHh], np.mean(Hep2[Hep1 == Hep1[hHh]])])
+    for hh in range(len(hep)):
+        herp.append([hep1[hh], np.mean(hep2[hep1 == hep1[hh]])])
 
-    Herp = np.array(Herp)
+    herp = np.array(herp)
 
-    Hap = []
+    hap = []
     k = 0
     puet = 1
 
-    for kui in range(len(Herp)):
-        for zui in range(len(Hap)):
-            if Herp[kui, 0] == Hap[zui][0]:
+    for kui in range(len(herp)):
+        for zui in range(len(hap)):
+            if herp[kui, 0] == hap[zui][0]:
                 puet = 0
-                Peaks_displacement[:-4][Herp[:, 0] == Hap[zui][0], 0] = Herp[zui, 1]
+                peaks_displacement[herp[:, 0] == hap[zui][0], 0] = herp[zui, 1]
         if puet:
-            Hap.append(Herp[kui])
+            hap.append(herp[kui])
             k += 1
         else:
             puet = 1
-    Hap = np.array(Hap)
+    hap = np.array(hap)
 
     # Linear interpolation inside the convex hull
-    Hum = interp1d(Hap[:, 0], Hap[:, 1], kind="linear", fill_value="extrapolate")(
-        np.arange(Target.shape[1])
+    hum = interp1d(hap[:, 0], hap[:, 1], kind="linear", fill_value="extrapolate")(
+        np.arange(target.shape[1])
     )
 
     # Linear extrapolation for outside the convex hull
-    Pks, Displ1D = Peaks_Ref[:-4, 0], Peaks_displacement[:-4, 0]
-    minPks, maxPks = np.min(Pks), np.max(Pks)
-    Hum2 = interp1d(
+    pks, displ1d = peaks_ref[:, 0], peaks_displacement[:, 0]
+    min_pks, max_pks = np.min(pks), np.max(pks)
+    hum2 = interp1d(
         [
-            minPks,
-            maxPks
+            min_pks,
+            max_pks
         ],
         [
-            np.mean(Displ1D[Pks == minPks]),
-            np.mean(Displ1D[Pks == maxPks]),
+            np.mean(displ1d[pks == min_pks]),
+            np.mean(displ1d[pks == max_pks]),
         ],
         kind="linear",
         fill_value="extrapolate",
-    )(np.arange(-1, Target.shape[1]+2))
+    )(np.arange(-1, target.shape[1] + 2))
 
     # Populate the displacement matrix
-    min_x_pksref, max_x_pksref = np.min(Peaks_Ref[:-4, 0]), np.max(Peaks_Ref[:-4, 0])
-    for w in range(Aligned.shape[0]):
-        for x in range(Aligned.shape[1]):
-            if Aligned[w, x] != 0:
+    min_x_pksref, max_x_pksref = np.min(peaks_ref[:, 0]), np.max(peaks_ref[:, 0])
+    for w in range(aligned.shape[0]):
+        for x in range(aligned.shape[1]):
+            if aligned[w, x] != 0:
                 continue
             if min_x_pksref <= x <= max_x_pksref:
-                Displacement[w, x, :] = [
-                    Fdist1[int(w-wo[0]), int(x * peak_ratio - xo[0])],
-                    Hum[x],
+                displacement[w, x, :] = [
+                    fdist1[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum[x],
                 ]
             else:
-                Displacement[w, x, :] = [
-                    Fdist1[int(w-wo[0]), int(x * peak_ratio - xo[0])],
-                    Hum2[x+1],
+                displacement[w, x, :] = [
+                    fdist1[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum2[x + 1],
                 ]
-    del Fdist1
+    del fdist1
 
     def apply_interpolation(ref, target, displacement, method="linear"):
         # Prepare grid for interpolation
@@ -752,83 +760,82 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
         
         method = "splinef2d" if method == "spline" else method
-        Aligned = interpn(points, Z.T, queries, method, fill_value=0)
-        Aligned = Aligned.reshape(Xq.shape)
+        aligned = interpn(points, Z.T, queries, method=method, fill_value=0)
+        aligned = aligned.reshape(target.shape)
+        return aligned
 
-        return Aligned
+    aligned = apply_interpolation(ref, target, displacement, method=inter_pixel_interp_meth)
 
-    Aligned = apply_interpolation(Ref, Target, Displacement, InterPixelInterpMeth)
+    for k in range(len(peaks_displacement)):
+        displacement[int(peaks_ref[k, 1]), int(peaks_ref[k, 0]), :] = peaks_displacement[k, ::-1]
 
-    for k in range(len(Peaks_displacement) - 4):
-        Displacement[int(Peaks_Ref[k, 1]), int(Peaks_Ref[k, 0]), :] = Peaks_displacement[k, ::-1]
+    # Extend displacement with borders
+    displacement_extended = np.zeros((aligned.shape[0] + 2, aligned.shape[1] + 2, 2))
+    displacement_extended[1:-1, 1:-1, :] = displacement
 
-    # Extend Displacement with borders
-    Displacement_Extended = np.zeros((Aligned.shape[0] + 2, Aligned.shape[1] + 2, 2))
-    Displacement_Extended[1:-1, 1:-1, :] = Displacement
-
-    natw, natx = Peaks_Ref[:, 1]+1, (Peaks_Ref[:, 0]+1) * peak_ratio
-    natv = Peaks_displacement[:, 1]
+    natw, natx = peaks_ref_corner[:, 1] + 1, (peaks_ref_corner[:, 0] + 1) * peak_ratio
+    natv = peaks_displacement_corner[:, 1]
     #TODO: fix ranges
-    wo = np.arange(-padding_w_lower, Aligned.shape[0] + 2 + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower* peak_ratio), np.round((Aligned.shape[1] + 2 + padding_x_upper)* peak_ratio))
-    Fdist1bis = natgrid(natw, natx, natv, wo, xo)
+    wo = np.arange(-padding_w_lower, aligned.shape[0] + 2 + padding_w_upper)
+    xo = np.arange(np.round(-padding_x_lower * peak_ratio), np.round((aligned.shape[1] + 2 + padding_x_upper) * peak_ratio))
+    fdist1bis = natgrid(natw, natx, natv, wo, xo)
 
-    for w in [0, Aligned.shape[0] + 1]:
-        for x in range(Aligned.shape[1] + 2):
-            if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
-                Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
-                    Hum[x],
+    for w in [0, aligned.shape[0] + 1]:
+        for x in range(aligned.shape[1] + 2):
+            if min_x_pksref <= x <= max_x_pksref:  #TODO: should we add a +1 for peaks?
+                displacement_extended[w, x, :] = [
+                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum[x],
                 ]
             else:
-                Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
-                    Hum2[x],
+                displacement_extended[w, x, :] = [
+                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum2[x],
                 ]
 
-    for w in range(1, Aligned.shape[0] + 1):
-        for x in [0, Aligned.shape[1] + 1]:
-            if min_x_pksref <= x <= max_x_pksref: #TODO: should we add a +1 for peaks ?
-                Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
-                    Hum[x],
+    for w in range(1, aligned.shape[0] + 1):
+        for x in [0, aligned.shape[1] + 1]:
+            if min_x_pksref <= x <= max_x_pksref:  #TODO: should we add a +1 for peaks?
+                displacement_extended[w, x, :] = [
+                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum[x],
                 ]
             else:
-                Displacement_Extended[w, x, :] = [
-                    Fdist1bis[int(w-wo[0]), int(x* peak_ratio - xo[0])],
-                    Hum2[x],
+                displacement_extended[w, x, :] = [
+                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                    hum2[x],
                 ]
-    del Fdist1bis, Hum, Hum2
+    del fdist1bis, hum, hum2
     gc.collect()
 
     # Initialize deformation arrays
-    Deform1 = np.zeros_like(Aligned)
-    Deform2 = np.zeros_like(Aligned)
+    deform1 = np.zeros_like(aligned)
+    deform2 = np.zeros_like(aligned)
 
-    # Compute Deformation
-    for w in range(Aligned.shape[0]):
-        for x in range(Aligned.shape[1]):
-            Deform1[w, x] = 2 + (
-                -Displacement_Extended[w, x + 1, 0]
-                + Displacement_Extended[w + 2, x + 1, 0]
+    # Compute deformation
+    for w in range(aligned.shape[0]):
+        for x in range(aligned.shape[1]):
+            deform1[w, x] = 2 + (
+                -displacement_extended[w, x + 1, 0]
+                + displacement_extended[w + 2, x + 1, 0]
             )
-            Deform2[w, x] = 2 + (
-                -Displacement_Extended[w + 1, x, 1]
-                + Displacement_Extended[w + 1, x + 2, 1]
+            deform2[w, x] = 2 + (
+                -displacement_extended[w + 1, x, 1]
+                + displacement_extended[w + 1, x + 2, 1]
             )
 
     # Correct for negative deformations
-    if np.any(Deform1 < 0) or np.any(Deform2 < 0):
+    if np.any(deform1 < 0) or np.any(deform2 < 0):
         print("Warning: Negative deformation detected. Adjusting to zero.")
-        Deform1[Deform1 < 0] = 0
-        Deform2[Deform2 < 0] = 0
+        deform1[deform1 < 0] = 0
+        deform2[deform2 < 0] = 0
 
     # Apply deformation correction
-    Aligned *= (Deform1 * Deform2) / 4
+    aligned *= (deform1 * deform2) / 4
 
-    Deform_output = np.stack((Deform1, Deform2), axis=-1)
+    deform_output = np.stack((deform1, deform2), axis=-1)
 
-    return Aligned, Displacement, Deform_output
+    return aligned, displacement, deform_output
 
 
 def equalize_size(chromato1, chromato2):
@@ -860,17 +867,17 @@ def equalize_size(chromato1, chromato2):
     return chromato1_eq, chromato2_eq
 
 
-def save_chromatogram(FileName, chromato_obj):
+def save_chromatogram(filename, chromato_obj):
     # Flatten the MSvaluebox and MSintbox arrays and remove zeros
-    MSvalueboxLine = chromato_obj["MSvaluebox"].T
-    MSintboxLine = chromato_obj["MSintbox"].T
-    MSvalueboxLine = MSvalueboxLine.flatten()
-    MSintboxLine = MSintboxLine.flatten()
-    chromato_obj["MSvalueboxLine"] = MSvalueboxLine[MSvalueboxLine != 0]
-    chromato_obj["MSintboxLine"] = MSintboxLine[MSvalueboxLine != 0]
+    ms_valuebox_line = chromato_obj["MSvaluebox"].T
+    ms_intbox_line = chromato_obj["MSintbox"].T
+    ms_valuebox_line = ms_valuebox_line.flatten()
+    ms_intbox_line = ms_intbox_line.flatten()
+    chromato_obj["MSvalueboxLine"] = ms_valuebox_line[ms_valuebox_line != 0]
+    chromato_obj["MSintboxLine"] = ms_intbox_line[ms_valuebox_line != 0]
 
     # Create a new NetCDF file with 64-bit offset
-    with Dataset(FileName, "w", format="NETCDF4") as ncnew:
+    with Dataset(filename, "w", format="NETCDF4") as ncnew:
         # Define dimensions
         scan_number = ncnew.createDimension(
             "scan_number", len(chromato_obj["scantime"])
@@ -881,33 +888,32 @@ def save_chromatogram(FileName, chromato_obj):
 
         # Define variables
         vardimfirst = ncnew.createVariable("flag_count", "i4", (scan_number,))
-        vardimA = ncnew.createVariable("scan_acquisition_time", "f8", (scan_number,))
-        vardimB = ncnew.createVariable("actual_scan_number", "i4", (scan_number,))
-        vardimC = ncnew.createVariable("mass_range_max", "f8", (scan_number,))
-        vardimD = ncnew.createVariable("mass_range_min", "f8", (scan_number,))
-        vardimE = ncnew.createVariable("scan_index", "i4", (scan_number,))
-        vardimF = ncnew.createVariable("point_count", "i4", (scan_number,))
-        vardimG = ncnew.createVariable("total_intensity", "f8", (scan_number,))
-        vardimH = ncnew.createVariable("mass_values", "f8", (point_number,))
-        vardimI = ncnew.createVariable("intensity_values", "f8", (point_number,))
+        vardim_a = ncnew.createVariable("scan_acquisition_time", "f8", (scan_number,))
+        vardim_b = ncnew.createVariable("actual_scan_number", "i4", (scan_number,))
+        vardim_c = ncnew.createVariable("mass_range_max", "f8", (scan_number,))
+        vardim_d = ncnew.createVariable("mass_range_min", "f8", (scan_number,))
+        vardim_e = ncnew.createVariable("scan_index", "i4", (scan_number,))
+        vardim_f = ncnew.createVariable("point_count", "i4", (scan_number,))
+        vardim_g = ncnew.createVariable("total_intensity", "f8", (scan_number,))
+        vardim_h = ncnew.createVariable("mass_values", "f8", (point_number,))
+        vardim_i = ncnew.createVariable("intensity_values", "f8", (point_number,))
 
         # Write data to variables
         vardimfirst[:] = chromato_obj["flag"]
-        vardimA[:] = chromato_obj["scantime"]
-        vardimB[:] = chromato_obj["scannum"]
-        vardimC[:] = chromato_obj["medmsmax"]
-        vardimD[:] = chromato_obj["medmsmin"]
-        vardimE[:] = chromato_obj["ionid"]
-        vardimF[:] = chromato_obj["eachscannum"]
-        vardimG[:] = chromato_obj["MStotint"]
-        vardimH[:] = chromato_obj["MSvalueboxLine"]
-        vardimI[:] = chromato_obj["MSintboxLine"]
-
+        vardim_a[:] = chromato_obj["scantime"]
+        vardim_b[:] = chromato_obj["scannum"]
+        vardim_c[:] = chromato_obj["medmsmax"]
+        vardim_d[:] = chromato_obj["medmsmin"]
+        vardim_e[:] = chromato_obj["ionid"]
+        vardim_f[:] = chromato_obj["eachscannum"]
+        vardim_g[:] = chromato_obj["MStotint"]
+        vardim_h[:] = chromato_obj["MSvalueboxLine"]
+        vardim_i[:] = chromato_obj["MSintboxLine"]
 
 if __name__ == "__main__":
     print("Running the main script.")
     print("Loading chromatograms and alignment points.")
-    ChromatoTarget, ChromatoRef = load_chromatograms(
+    chromato_target, chromato_ref = load_chromatograms(
         input_path=INPUT_PATH,
         target_file=TARGET_CHROMATOGRAM_FILE,
         reference_file=REFERENCE_CHROMATOGRAM_FILE,
@@ -920,8 +926,8 @@ if __name__ == "__main__":
         target_file=TARGET_ALIGNMENT_PTS_FILE,
         input_path=INPUT_PATH,
         output_path=OUTPUT_PATH,
-        ChromatoRef=ChromatoRef,
-        ChromatoTarget=ChromatoTarget,
+        chromato_ref=chromato_ref,
+        chromato_target=chromato_target,
     )
     #TODO: to remove
     reference_peaks -= 1
@@ -929,45 +935,45 @@ if __name__ == "__main__":
     print("Alignment points loaded successfully.")
 
     print("Reshaping chromatogram data.")
-    target_TIC = reshape_tic(ChromatoTarget["MStotint"], NBPIX2NDD_TARGET)
-    ref_TIC = reshape_tic(ChromatoRef["MStotint"], NBPIX2NDD_REF)
+    target_tic = reshape_tic(chromato_target["MStotint"], NBPIX2NDD_TARGET)
+    ref_tic = reshape_tic(chromato_ref["MStotint"], NBPIX2NDD_REF)
     print("Chromatogram data reshaped successfully.")
-    del ChromatoRef
+    del chromato_ref
 
     print("Rounding MS data.")
     time_start = time.time()
-    ChromatoTarget["MSvaluebox"], ChromatoTarget["MSintbox"] = round_and_aggregate_unique_ms_data(
-        ChromatoTarget["MSvaluebox"], ChromatoTarget["MSintbox"]
+    chromato_target["MSvaluebox"], chromato_target["MSintbox"] = round_and_aggregate_unique_ms_data(
+        chromato_target["MSvaluebox"], chromato_target["MSintbox"]
     )
     time_end = time.time()
     print("MS data rounded successfully. Time taken:", time_end - time_start)
 
     aligned_result = align_2d_chrom_ms_v5(
-        Ref=ref_TIC,
-        Other=target_TIC,
-        Peaks_Ref=reference_peaks,
-        Peaks_Other=target_peaks,
-        MSvaluebox=ChromatoTarget["MSvaluebox"],
-        MSintbox=ChromatoTarget["MSintbox"],
-        NbPix2ndD=NBPIX2NDD_REF,
-        Peak_widths=TYPICAL_PEAK_WIDTH,
+        ref=ref_tic,
+        other=target_tic,
+        peaks_ref=reference_peaks,
+        peaks_other=target_peaks,
+        ms_valuebox=chromato_target["MSvaluebox"],
+        ms_intbox=chromato_target["MSintbox"],
+        nb_pix_2nd_d=NBPIX2NDD_REF,
+        peak_widths=TYPICAL_PEAK_WIDTH,
         model_choice=MODEL_CHOICE,
     )
-    del ref_TIC, target_TIC
+    del ref_tic, target_tic
     gc.collect()
 
-    Alignedeachscannum = np.sum(aligned_result["MSvaluebox"] != 0, axis=1)
-    Alignedionid = np.cumsum(Alignedeachscannum)
-    AlignedMStotint = np.sum(aligned_result["MSintbox"], axis=1)
+    aligned_each_scan_num = np.sum(aligned_result["MSvaluebox"] != 0, axis=1)
+    aligned_ion_id = np.cumsum(aligned_each_scan_num)
+    aligned_ms_tot_int = np.sum(aligned_result["MSintbox"], axis=1)
 
-    aligned_result["scannum"] = ChromatoTarget["scannum"]
-    aligned_result["flag"] = ChromatoTarget["flag"]
-    aligned_result["medmsmax"] = ChromatoTarget["medmsmax"]
-    aligned_result["medmsmin"] = ChromatoTarget["medmsmin"]
-    aligned_result["scantime"] = ChromatoTarget["scantime"]
-    aligned_result["eachscannum"] = Alignedeachscannum
-    aligned_result["ionid"] = Alignedionid
-    aligned_result["MStotint"] = AlignedMStotint
+    aligned_result["scannum"] = chromato_target["scannum"]
+    aligned_result["flag"] = chromato_target["flag"]
+    aligned_result["medmsmax"] = chromato_target["medmsmax"]
+    aligned_result["medmsmin"] = chromato_target["medmsmin"]
+    aligned_result["scantime"] = chromato_target["scantime"]
+    aligned_result["eachscannum"] = aligned_each_scan_num
+    aligned_result["ionid"] = aligned_ion_id
+    aligned_result["MStotint"] = aligned_ms_tot_int
 
     print("Saving aligned chromatogram.")
     output_file_name = os.path.join(
