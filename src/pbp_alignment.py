@@ -13,9 +13,9 @@ from ngl import natgrid
 #TODO: handle global parameters in a better way (use dictionary)
 #TODO: implement DualSibson model
 #TODO: test the code with time units
-#TODO: make a separate function to launch the alignment
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
+#TODO: create notebook to demonstrate the usage of the code
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -910,9 +910,10 @@ def save_chromatogram(filename, chromato_obj):
         vardim_h[:] = chromato_obj["MSvalueboxLine"]
         vardim_i[:] = chromato_obj["MSintboxLine"]
 
-if __name__ == "__main__":
+def run_chromatogram_alignment():
     print("Running the main script.")
     print("Loading chromatograms and alignment points.")
+    
     chromato_target, chromato_ref = load_chromatograms(
         input_path=INPUT_PATH,
         target_file=TARGET_CHROMATOGRAM_FILE,
@@ -982,3 +983,6 @@ if __name__ == "__main__":
 
     save_chromatogram(output_file_name, aligned_result)
     print("Aligned chromatogram saved successfully.")
+
+if __name__ == "__main__":
+    run_chromatogram_alignment()
