@@ -16,6 +16,7 @@ from ngl import natgrid
 #TODO: make a separate function to launch the alignment
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
+#TODO: use snake_case for variable names
 
 # ---------------------------------------------------------------------
 # INSTRUMENT PARAMETERS
@@ -577,7 +578,7 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
     # Ensure ref and target have the same size
     Ref, Target = equalize_size(Ref, Target)
 
-    # Normalize distances
+    # Compute the peak ratio to normalize distances
     peak_ratio = peak_widths[1] / peak_widths[0]
 
     # Compute displacement
@@ -725,44 +726,38 @@ def align_chromato(Ref, Target, Peaks_Ref, Peaks_Target, **kwargs):
                 ]
     del Fdist1
 
-    # Prepare the output grid (X,Y,Z)
-    X = np.ones((Ref.shape[0] * 2, 1)) * np.arange(Ref.shape[1])
-    Y = np.arange(
-        -round(Ref.shape[0] / 2),
-        Ref.shape[0] + (Ref.shape[0] - round(Ref.shape[0] / 2)),
-    ).reshape(-1, 1) * np.ones((1, Ref.shape[1]))
+    def apply_interpolation(ref, target, displacement, method="linear"):
+        # Prepare grid for interpolation
+        rh, rw = ref.shape
+        th, tw = target.shape
 
-    Z = np.zeros((Target.shape[0] * 2, Target.shape[1]))
-    Z[: int(np.floor(Target.shape[0] / 2)), 1:] = Target[
-        int(np.floor(Target.shape[0] / 2)) :, :-1
-    ]
-    Z[
-        int(np.round(Target.shape[0] / 2)) : int(np.round(Target.shape[0] / 2))
-        + Target.shape[0],
-        :,
-    ] = Target
-    Z[int(np.floor(Target.shape[0] / 2)) + Target.shape[0] :, :-1] = Target[
-        : int(np.ceil(Target.shape[0] / 2)), 1:
-    ]
+        X = np.tile(np.arange(rw), (rh * 2, 1))
+        h_half = round(rh / 2)
+        Y = np.arange(-h_half, rh + rh - h_half).reshape(-1, 1)
+        Y = np.tile(Y, (1, rw))
 
-    #TODO: refactor this part
-    def interpolate_2d(X, Y, Z, Xq, Yq, method):
+        Z = np.zeros((th * 2, tw))
+        mid_floor, mid_ceil = int(np.floor(th / 2)), int(np.ceil(th / 2))
+
+        Z[:mid_floor, 1:] = target[mid_floor:, :-1]
+        Z[mid_floor:mid_floor + th, :] = target
+        Z[mid_floor + th:, :-1] = target[:mid_ceil, 1:]
+
+        mid_idx = round(th / 2)
+        Xq = X[mid_idx : mid_idx + th, :] + displacement[:, :, 1]
+        Yq = Y[mid_idx : mid_idx + th, :] + displacement[:, :, 0]
+        
+        # 2d interpolation
         points = (X[0, :], Y[:, 0])
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
-        Aligned = interpn(points, Z.T, queries, method=method, fill_value=0)
-        return Aligned.reshape(Xq.shape)
+        
+        method = "splinef2d" if method == "spline" else method
+        Aligned = interpn(points, Z.T, queries, method, fill_value=0)
+        Aligned = Aligned.reshape(Xq.shape)
 
-    mid_idx = round(Target.shape[0] / 2)
-    Xq = X[mid_idx : mid_idx + Target.shape[0], :] + Displacement[:, :, 1]
-    Yq = Y[mid_idx : mid_idx + Target.shape[0], :] + Displacement[:, :, 0]
+        return Aligned
 
-    if InterPixelInterpMeth in ["spline", "cubic", "linear"]:
-        method = "splinef2d" if InterPixelInterpMeth == "spline" else InterPixelInterpMeth
-        Aligned = interpolate_2d(X, Y, Z, Xq, Yq, method)
-    else:
-        raise ValueError(f"Unsupported interpolation method: {InterPixelInterpMeth}")
-    del X, Y, Z, Xq, Yq
-    gc.collect()
+    Aligned = apply_interpolation(Ref, Target, Displacement, InterPixelInterpMeth)
 
     for k in range(len(Peaks_displacement) - 4):
         Displacement[int(Peaks_Ref[k, 1]), int(Peaks_Ref[k, 0]), :] = Peaks_displacement[k, ::-1]
