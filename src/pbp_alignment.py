@@ -15,7 +15,6 @@ from ngl import natgrid
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
 #TODO: create notebook to demonstrate the usage of the code
-#TODO: add example on possible values for config.json
 #TODO: add the use of mod_time
 # ---------------------------------------------------------------------
 
