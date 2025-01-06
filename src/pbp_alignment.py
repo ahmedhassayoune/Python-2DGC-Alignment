@@ -11,7 +11,6 @@ from ngl import natgrid
 
 # ---------------------------------------------------------------------
 #TODO: add comment to tell automatic transformation if using peaks instead of pixels
-#TODO: implement DualSibson model
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
 #TODO: create notebook to demonstrate the usage of the code
@@ -368,24 +367,19 @@ def align_2d_chrom_ms_v5(
     inter_pixel_interp_meth = kwargs.get("inter_pixel_interp_meth", "linear")
     model_choice = kwargs.get("model_choice", "normal")
 
-    if model_choice == "normal":
-        aligned, displacement, deform_output = align_chromato(
-            ref=ref,
-            target=np.squeeze(other),
-            peaks_ref=peaks_ref,
-            peaks_target=peaks_other,
-            power_factor=power_factor,
-            peak_widths=peak_widths,
-            inter_pixel_interp_meth=inter_pixel_interp_meth,
-        )
-    elif model_choice == "DualSibson":
-        # TODO: implement DualSibson model
-        # aligned, displacement, deform_output = (
-        #     alignChromato_with_SibsonInterp_also_1stD()
-        # )
-        pass
-    else:
+    if model_choice not in ["normal", "DualSibson"]:
         raise ValueError(f"Invalid model choice: {model_choice}.")
+
+    aligned, displacement, deform_output = align_chromato(
+        ref=ref,
+        target=np.squeeze(other),
+        peaks_ref=peaks_ref,
+        peaks_target=peaks_other,
+        model_choice=model_choice,
+        power_factor=power_factor,
+        peak_widths=peak_widths,
+        inter_pixel_interp_meth=inter_pixel_interp_meth,
+    )
 
     ms_pixels_inds = np.arange(ms_valuebox.shape[0])
     aligned_inds = [np.zeros_like(ms_pixels_inds) for _ in range(4)]
@@ -554,7 +548,7 @@ def compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_di
         return interp_distr[ht] * interp_distt[ht] * defm[ht]
 
 
-def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
+def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs):
     """
     Aligns the target chromatogram to the reference chromatogram.
 
@@ -563,6 +557,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
         target (numpy.ndarray): Target chromatogram (2D matrix).
         peaks_ref (numpy.ndarray): Positions of alignment points in ref (Nx2 matrix).
         peaks_target (numpy.ndarray): Positions of alignment points in target (Nx2 matrix).
+        model_choice (str): Choice of model for alignment: 'normal' or 'DualSibson'.
         **kwargs: Optional parameters:
             - 'power_factor' (float): Weighting factor for inverse distance, default 2.
             - 'peak_widths' (list): Typical peak widths [width_1st_dim, width_2nd_dim], default [1, 1].
@@ -658,11 +653,12 @@ def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
 
     natw = peaks_ref_corner[:, 1]
     natx = peaks_ref_corner[:, 0] * peak_ratio
-    natv = peaks_displacement_corner[:, 1]
     #TODO: fix ranges
     wo = np.arange(-padding_w_lower, aligned.shape[0] + padding_w_upper)
     xo = np.arange(np.round(-padding_x_lower * peak_ratio), np.round((aligned.shape[1] + padding_x_upper) * peak_ratio))
-    fdist1 = natgrid(natw, natx, natv, wo, xo)
+
+    fdist1 = natgrid(natw, natx, peaks_displacement_corner[:, 1], wo, xo)
+    fdist2 = natgrid(natw, natx, peaks_displacement_corner[:, 0], wo, xo) if model_choice == "DualSibson" else None
 
     hep = np.vstack([peaks_ref[:, 0], peaks_displacement[:, 0]]).T
     hep1 = hep[:, 0]
@@ -717,17 +713,17 @@ def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
         for x in range(aligned.shape[1]):
             if aligned[w, x] != 0:
                 continue
-            if min_x_pksref <= x <= max_x_pksref:
+            if model_choice == "normal":
                 displacement[w, x, :] = [
                     fdist1[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum[x],
+                    hum[x] if min_x_pksref <= x <= max_x_pksref else hum2[x+1],
                 ]
             else:
                 displacement[w, x, :] = [
                     fdist1[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum2[x + 1],
+                    fdist2[int(w - wo[0]), int(x * peak_ratio - xo[0])],
                 ]
-    del fdist1
+    del fdist1, fdist2
 
     def apply_interpolation(ref, target, displacement, method="linear"):
         # Prepare grid for interpolation
@@ -755,7 +751,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
         
         method = "splinef2d" if method == "spline" else method
-        aligned = interpn(points, Z.T, queries, method=method, fill_value=0)
+        aligned = interpn(points, Z.T, queries, method=method, fill_value=0, bounds_error=False)
         aligned = aligned.reshape(target.shape)
         return aligned
 
@@ -821,7 +817,8 @@ def align_chromato(ref, target, peaks_ref, peaks_target, **kwargs):
 
     # Correct for negative deformations
     if np.any(deform1 < 0) or np.any(deform2 < 0):
-        print("Warning: Negative deformation detected. Adjusting to zero.")
+        print("Warning: Some displacement predictions lead to inversion of pixel order (as indicated by negative values in Deform_output, "
+            "here set to zero) please change your set of alignment points!")
         deform1[deform1 < 0] = 0
         deform2[deform2 < 0] = 0
 
