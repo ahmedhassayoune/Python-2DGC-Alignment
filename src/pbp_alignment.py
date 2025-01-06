@@ -12,10 +12,11 @@ from ngl import natgrid
 # ---------------------------------------------------------------------
 #TODO: add comment to tell automatic transformation if using peaks instead of pixels
 #TODO: implement DualSibson model
-#TODO: test the code with time units
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
 #TODO: create notebook to demonstrate the usage of the code
+#TODO: add example on possible values for config.json
+#TODO: add the use of mod_time
 # ---------------------------------------------------------------------
 
 def load_config(config_path):
@@ -32,6 +33,17 @@ def load_config(config_path):
         return json.load(config_file)
 
 def open_chromatogram(filename, int_thresh, drift_ms):
+    """
+    Opens a chromatogram file and extracts the relevant data.
+    
+    Parameters:
+        filename (str): Path to the chromatogram file.
+        int_thresh (int): Intensity threshold for filtering.
+        drift_ms (float): Drift time in milliseconds.
+    
+    Returns:
+        dict: A dictionary containing the chromatogram data
+    """
     # Open the CDF file
     with Dataset(filename, "r") as cdf:
         # Retrieve data from the file
@@ -233,12 +245,12 @@ def load_alignment_points(
             chromato_ref["RTini"],
         )
         typical_peak_width = time_to_pix(
-            typical_peak_width,
+            np.array([typical_peak_width]),
             nb_pix_2nd_d_ref / chromato_ref["SamRate"],
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
-        config["model_choice_params"]["TYPICAL_PEAK_WIDTH"] = typical_peak_width
+        config["model_choice_params"]["TYPICAL_PEAK_WIDTH"] = typical_peak_width[0]
 
     return reference_peaks, target_peaks
 
@@ -933,8 +945,8 @@ def run_chromatogram_alignment(config_path):
     print("Alignment points loaded successfully.")
 
     print("Reshaping chromatogram data...")
-    target_tic = reshape_tic(chromato_target["MStotint"], config["instrument_params"]["NBPIX2NDD_TARGET"])
     ref_tic = reshape_tic(chromato_ref["MStotint"], config["instrument_params"]["NBPIX2NDD_REF"])
+    target_tic = reshape_tic(chromato_target["MStotint"], config["instrument_params"]["NBPIX2NDD_TARGET"])
     print("Chromatogram data reshaped successfully.")
     del chromato_ref
 
@@ -981,5 +993,5 @@ def run_chromatogram_alignment(config_path):
     print("Aligned chromatogram saved successfully.")
 
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "pbp_alignment_config.json")
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "pbp_pixel_config.json")
     run_chromatogram_alignment(config_path)

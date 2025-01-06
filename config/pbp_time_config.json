@@ -1,0 +1,22 @@
+{
+  "instrument_params": {
+    "PRECISION": 2,
+    "INTTHRESHOLD": 0,
+    "NBPIX2NDD_TARGET": 160,
+    "NBPIX2NDD_REF": 160,
+    "DRIFTMS": 0
+  },
+  "model_choice_params": {
+    "TYPICAL_PEAK_WIDTH": [7.2, 0.25224],
+    "MODEL_CHOICE": "normal",
+    "UNITS": "time"
+  },
+  "io_params": {
+    "OUTPUT_PATH": "/home/ahassayoune/GCxGC-MS-alignment/users/output/",
+    "INPUT_PATH": "/home/ahassayoune/GCxGC-MS-alignment/users/input/",
+    "REFERENCE_CHROMATOGRAM_FILE": "Test_reference_chromatogram.cdf",
+    "TARGET_CHROMATOGRAM_FILE": "Test_target_chromatogram.cdf",
+    "REFERENCE_ALIGNMENT_PTS_FILE": "Alignment_pts_Reference_time_unit.csv",
+    "TARGET_ALIGNMENT_PTS_FILE": "Alignment_pts_Target_time_unit.csv"
+  }
+}
