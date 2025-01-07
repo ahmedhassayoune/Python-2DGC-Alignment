@@ -12,7 +12,6 @@ from ngl import natgrid
 # ---------------------------------------------------------------------
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
-#TODO: create notebook to demonstrate the usage of the code
 # ---------------------------------------------------------------------
 
 def load_config(config_path):
@@ -907,16 +906,14 @@ def save_chromatogram(filename, chromato_obj):
         vardim_h[:] = chromato_obj["MSvalueboxLine"]
         vardim_i[:] = chromato_obj["MSintboxLine"]
 
-def run_chromatogram_alignment(config_path):
+def run_chromatogram_alignment(config):
     """
     Main function to run the chromatogram alignment process.
     
     Parameters:
-        config_path (str): Path to the configuration file.
+        config (dict): Dictionary containing the configuration parameters.
     """
     print("Running the main script.")
-    config = load_config(config_path)
-
     print("Loading chromatograms and alignment points...")
     chromato_target, chromato_ref = load_chromatograms(
         input_path=config["io_params"]["INPUT_PATH"],
@@ -992,4 +989,5 @@ def run_chromatogram_alignment(config_path):
 
 if __name__ == "__main__":
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "pbp_pixel_config.json")
-    run_chromatogram_alignment(config_path)
+    config = load_config(config_path)
+    run_chromatogram_alignment(config)
