@@ -10,11 +10,9 @@ from scipy.interpolate import interpn, interp1d
 from ngl import natgrid
 
 # ---------------------------------------------------------------------
-#TODO: add comment to tell automatic transformation if using peaks instead of pixels
 #TODO: use arrays with float32 if precision is not needed
 #TODO: maybe structure all the code in separate files
 #TODO: create notebook to demonstrate the usage of the code
-#TODO: add the use of mod_time
 # ---------------------------------------------------------------------
 
 def load_config(config_path):
@@ -150,13 +148,13 @@ def load_chromatograms(input_path, target_file, reference_file, int_thresh, drif
     return chromato_target, chromato_ref
 
 
-def time_to_pix(rttime, mod, freq, isot=0):
+def time_to_pix(rttime, mod_time, freq, isot=0):
     """
     Converts retention times from units of time to units of pixels.
 
     Parameters:
     - rttime: numpy array of shape (n, 2), where each row is [retention time 1, retention time 2]
-    - mod: Modulation rate, in seconds
+    - mod_time: Modulation rate, in seconds
     - freq: Sampling frequency, in Hz
     - isot: Optional suppression time at the beginning of the chromatogram, in minutes (default is 0)
 
@@ -167,7 +165,7 @@ def time_to_pix(rttime, mod, freq, isot=0):
     rtpix = np.zeros_like(rttime, dtype=int)
     # Calculate pixels based on time values
     rtpix[:, 1] = np.round(rttime[:, 1] * freq).astype(int)
-    rtpix[:, 0] = np.round((rttime[:, 0] - isot) * 60 / mod).astype(int)
+    rtpix[:, 0] = np.round((rttime[:, 0] - isot) * 60 / mod_time).astype(int)
 
     return rtpix
 
@@ -194,8 +192,8 @@ def load_alignment_points(
     input_path=config["io_params"]["INPUT_PATH"]
     output_path=config["io_params"]["OUTPUT_PATH"]
     units=config["model_choice_params"]["UNITS"]
-    nb_pix_2nd_d_ref=config["instrument_params"]["NBPIX2NDD_REF"]
-    nb_pix_2nd_d_target=config["instrument_params"]["NBPIX2NDD_TARGET"]
+    modtime_ref=config["instrument_params"]["MODTIME_REF"]
+    modtime_target=config["instrument_params"]["MODTIME_TARGET"]
     typical_peak_width=config["model_choice_params"]["TYPICAL_PEAK_WIDTH"]
 
     # Helper function to find and load a file
@@ -232,19 +230,19 @@ def load_alignment_points(
         # Convert time units to pixel units
         target_peaks = time_to_pix(
             target_peaks,
-            nb_pix_2nd_d_target / chromato_target["SamRate"],
+            modtime_target,
             chromato_target["SamRate"],
             chromato_target["RTini"],
         )
         reference_peaks = time_to_pix(
             reference_peaks,
-            nb_pix_2nd_d_ref / chromato_ref["SamRate"],
+            modtime_ref,
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
         typical_peak_width = time_to_pix(
             np.array([typical_peak_width]),
-            nb_pix_2nd_d_ref / chromato_ref["SamRate"],
+            modtime_ref,
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
@@ -939,10 +937,14 @@ def run_chromatogram_alignment(config_path):
     reference_peaks -= 1
     target_peaks -= 1
     print("Alignment points loaded successfully.")
+    
+    # Compute the number of pixels in the 2nd dimension based on the modulation time and sampling rate
+    nb_pix_2nd_d_ref = int(config["instrument_params"]["MODTIME_REF"] * chromato_ref["SamRate"])
+    nb_pix_2nd_d_target = int(config["instrument_params"]["MODTIME_TARGET"] * chromato_target["SamRate"])
 
     print("Reshaping chromatogram data...")
-    ref_tic = reshape_tic(chromato_ref["MStotint"], config["instrument_params"]["NBPIX2NDD_REF"])
-    target_tic = reshape_tic(chromato_target["MStotint"], config["instrument_params"]["NBPIX2NDD_TARGET"])
+    ref_tic = reshape_tic(chromato_ref["MStotint"], nb_pix_2nd_d_ref)
+    target_tic = reshape_tic(chromato_target["MStotint"], nb_pix_2nd_d_target)
     print("Chromatogram data reshaped successfully.")
     del chromato_ref
 
@@ -961,7 +963,7 @@ def run_chromatogram_alignment(config_path):
         peaks_other=target_peaks,
         ms_valuebox=chromato_target["MSvaluebox"],
         ms_intbox=chromato_target["MSintbox"],
-        nb_pix_2nd_d=config["instrument_params"]["NBPIX2NDD_REF"],
+        nb_pix_2nd_d=nb_pix_2nd_d_ref,
         peak_widths=config["model_choice_params"]["TYPICAL_PEAK_WIDTH"],
         model_choice=config["model_choice_params"]["MODEL_CHOICE"],
     )
