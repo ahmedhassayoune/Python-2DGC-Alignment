@@ -2,8 +2,7 @@
   "instrument_params": {
     "PRECISION": 2,
     "INTTHRESHOLD": 0,
-    "MODTIME_TARGET": 8.1,
-    "MODTIME_REF": 8.1,
+    "MODTIME": 8.1,
     "DRIFTMS": 0
   },
   "model_choice_params": {

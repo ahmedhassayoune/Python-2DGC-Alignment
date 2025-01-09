@@ -193,8 +193,7 @@ def load_alignment_points(chromato_ref, chromato_target, config):
     input_path = config["io_params"]["INPUT_PATH"]
     output_path = config["io_params"]["OUTPUT_PATH"]
     units = config["model_choice_params"]["UNITS"]
-    modtime_ref = config["instrument_params"]["MODTIME_REF"]
-    modtime_target = config["instrument_params"]["MODTIME_TARGET"]
+    mod_time = config["instrument_params"]["MODTIME"]
     typical_peak_width = config["model_choice_params"]["TYPICAL_PEAK_WIDTH"]
 
     # Helper function to find and load a file
@@ -231,19 +230,19 @@ def load_alignment_points(chromato_ref, chromato_target, config):
         # Convert time units to pixel units
         target_peaks = time_to_pix(
             target_peaks,
-            modtime_target,
+            mod_time,
             chromato_target["SamRate"],
             chromato_target["RTini"],
         )
         reference_peaks = time_to_pix(
             reference_peaks,
-            modtime_ref,
+            mod_time,
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
         typical_peak_width = time_to_pix(
             np.array([typical_peak_width]),
-            modtime_ref,
+            mod_time,
             chromato_ref["SamRate"],
             chromato_ref["RTini"],
         )
@@ -971,17 +970,14 @@ def run_chromatogram_alignment(config):
     reference_peaks, target_peaks = load_alignment_points(
         chromato_ref=chromato_ref, chromato_target=chromato_target, config=config
     )
-    # TODO: to remove
-    reference_peaks -= 1
-    target_peaks -= 1
     print("Alignment points loaded successfully.")
 
     # Compute the number of pixels in the 2nd dimension based on the modulation time and sampling rate
     nb_pix_2nd_d_ref = int(
-        config["instrument_params"]["MODTIME_REF"] * chromato_ref["SamRate"]
+        config["instrument_params"]["MODTIME"] * chromato_ref["SamRate"]
     )
     nb_pix_2nd_d_target = int(
-        config["instrument_params"]["MODTIME_TARGET"] * chromato_target["SamRate"]
+        config["instrument_params"]["MODTIME"] * chromato_target["SamRate"]
     )
 
     print("Reshaping chromatogram data...")
