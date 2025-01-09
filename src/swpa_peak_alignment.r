@@ -43,7 +43,8 @@ for (target_path in targets_paths) {
   results <- swpa2gc(
     swdata = swd,
     id1 = 2,        # Index for target
-    id2 = 1         # Index for reference
+    id2 = 1,         # Index for reference
+    opt = T
   )
   
   # Generate output filename by removing file extension from target path
@@ -51,5 +52,5 @@ for (target_path in targets_paths) {
   basename <- sub("\\.[^.]*$", "", basename)
   
   # Save results to a CSV file
-  write.csv(results$align, file=paste0(output_dir, "/", basename, "_aligned.csv") , row.names=TRUE)
+  write.csv(results$align, file=paste0(output_dir, "/", basename, ".csv") , row.names=TRUE)
 }

@@ -83,7 +83,8 @@ def read_chroma(filename, mod_time = 1.25, max_val = None):
     """
     ds = nc.Dataset(filename)
     chromato = ds['total_intensity']
-    sam_rate = 1 / ds['scan_duration'][0]
+    Timepara = ds["scan_acquisition_time"][np.abs(ds["point_count"]) < np.iinfo(np.int32).max]
+    sam_rate = 1 / np.mean(Timepara[1:] - Timepara[:-1])
     l1 = math.floor(sam_rate * mod_time)
     l2 = math.floor(len(chromato) / l1)
 
@@ -94,8 +95,8 @@ def read_chroma(filename, mod_time = 1.25, max_val = None):
         mv = ds["mass_values"][:]
         iv = ds["intensity_values"][:]
 
-    range_min = math.ceil(ds["mass_range_min"][0])
-    range_max = math.floor(ds["mass_range_max"][1])
+    range_min = math.ceil(ds["mass_range_min"][:].min())
+    range_max = math.floor(ds["mass_range_max"][:].max())
 
     chromato = np.reshape(chromato[:l1*l2], (l2,l1))
     return chromato, (ds['scan_acquisition_time'][0] / 60, ds['scan_acquisition_time'][-1] / 60), (l1, l2, mv, iv, range_min, range_max)
