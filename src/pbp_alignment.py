@@ -765,7 +765,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
         Z = np.zeros((th * 2, tw))
         mid_floor, mid_ceil = int(np.floor(th / 2)), int(np.ceil(th / 2))
 
-        Z[:mid_floor, 1:] = target[mid_floor:, :-1]
+        Z[:mid_floor, 1:] = target[mid_ceil:, :-1]
         Z[mid_floor : mid_floor + th, :] = target
         Z[mid_floor + th :, :-1] = target[:mid_ceil, 1:]
 
