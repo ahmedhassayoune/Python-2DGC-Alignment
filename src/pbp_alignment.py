@@ -10,32 +10,34 @@ from scipy.interpolate import interpn, interp1d
 from ngl import natgrid
 
 # ---------------------------------------------------------------------
-#TODO: use arrays with float32 if precision is not needed
-#TODO: maybe structure all the code in separate files
+# TODO: use arrays with float32 if precision is not needed
+# TODO: maybe structure all the code in separate files
 # ---------------------------------------------------------------------
+
 
 def load_config(config_path):
     """
     Loads the configuration parameters from the specified JSON file.
-    
+
     Parameters:
         config_path (str): Path to the configuration file.
-    
+
     Returns:
         dict: A dictionary containing the configuration parameters.
     """
     with open(config_path, "r") as config_file:
         return json.load(config_file)
 
+
 def open_chromatogram(filename, int_thresh, drift_ms):
     """
     Opens a chromatogram file and extracts the relevant data.
-    
+
     Parameters:
         filename (str): Path to the chromatogram file.
         int_thresh (int): Intensity threshold for filtering.
         drift_ms (float): Drift time in milliseconds.
-    
+
     Returns:
         dict: A dictionary containing the chromatogram data
     """
@@ -69,7 +71,7 @@ def open_chromatogram(filename, int_thresh, drift_ms):
     # Populate MS data boxes
     for i_num in range(pixel_num):
         if abs(each_scan_num[i_num]) < np.iinfo(np.int32).max:
-            initial = np.sum(each_scan_num[:i_num+1]) - each_scan_num[i_num]
+            initial = np.sum(each_scan_num[: i_num + 1]) - each_scan_num[i_num]
             acq_range = (
                 np.arange(
                     min(initial, initial + each_scan_num[i_num] - 1),
@@ -118,14 +120,14 @@ def open_chromatogram(filename, int_thresh, drift_ms):
 def load_chromatograms(input_path, target_file, reference_file, int_thresh, drift_ms):
     """
     Loads the target and reference chromatograms from the input path.
-    
+
     Parameters:
         input_path (str): Path to the input directory.
         target_file (str): Name of the target chromatogram file.
         reference_file (str): Name of the reference chromatogram file.
         int_thresh (int): Intensity threshold for filtering.
         drift_ms (float): Drift time in milliseconds.
-    
+
     Returns:
         tuple: Two dictionaries containing the target and reference chromatograms.
     """
@@ -141,8 +143,12 @@ def load_chromatograms(input_path, target_file, reference_file, int_thresh, drif
             f"Reference chromatogram file {reference_chromato_path} does not exist."
         )
 
-    chromato_target = open_chromatogram(target_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms)
-    chromato_ref = open_chromatogram(reference_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms)
+    chromato_target = open_chromatogram(
+        target_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms
+    )
+    chromato_ref = open_chromatogram(
+        reference_chromato_path, int_thresh=int_thresh, drift_ms=drift_ms
+    )
 
     return chromato_target, chromato_ref
 
@@ -169,11 +175,7 @@ def time_to_pix(rttime, mod_time, freq, isot=0):
     return rtpix
 
 
-def load_alignment_points(
-    chromato_ref,
-    chromato_target,
-    config
-):
+def load_alignment_points(chromato_ref, chromato_target, config):
     """
     Imports and processes alignment points for reference and target chromatograms.
 
@@ -185,15 +187,15 @@ def load_alignment_points(
     Returns:
     - reference_peaks, target_peaks, typical_peak_width: numpy arrays
     """
-    
-    reference_file=config["io_params"]["REFERENCE_ALIGNMENT_PTS_FILE"]
-    target_file=config["io_params"]["TARGET_ALIGNMENT_PTS_FILE"]
-    input_path=config["io_params"]["INPUT_PATH"]
-    output_path=config["io_params"]["OUTPUT_PATH"]
-    units=config["model_choice_params"]["UNITS"]
-    modtime_ref=config["instrument_params"]["MODTIME_REF"]
-    modtime_target=config["instrument_params"]["MODTIME_TARGET"]
-    typical_peak_width=config["model_choice_params"]["TYPICAL_PEAK_WIDTH"]
+
+    reference_file = config["io_params"]["REFERENCE_ALIGNMENT_PTS_FILE"]
+    target_file = config["io_params"]["TARGET_ALIGNMENT_PTS_FILE"]
+    input_path = config["io_params"]["INPUT_PATH"]
+    output_path = config["io_params"]["OUTPUT_PATH"]
+    units = config["model_choice_params"]["UNITS"]
+    modtime_ref = config["instrument_params"]["MODTIME_REF"]
+    modtime_target = config["instrument_params"]["MODTIME_TARGET"]
+    typical_peak_width = config["model_choice_params"]["TYPICAL_PEAK_WIDTH"]
 
     # Helper function to find and load a file
     def load_file(filename, input_path, output_path):
@@ -254,11 +256,11 @@ def reshape_tic(ms_totint, nb_pix_2nd_d):
     """
     Reshapes the ms_totint array into a 2D array with rows of size nb_pix_2nd_d,
     padding with zeros if necessary.
-    
+
     Parameters:
         ms_totint (numpy.ndarray): Input 1D array of intensities.
         nb_pix_2nd_d (int): Number of rows for the reshaped array.
-    
+
     Returns:
         numpy.ndarray: Reshaped 2D array.
     """
@@ -266,11 +268,11 @@ def reshape_tic(ms_totint, nb_pix_2nd_d):
     pad_length = nb_pix_2nd_d - (len(ms_totint) % nb_pix_2nd_d)
     if pad_length == nb_pix_2nd_d:  # No padding needed
         pad_length = 0
-    
-    padded_ms_totint = np.pad(ms_totint, (0, pad_length), mode='constant')
-    
+
+    padded_ms_totint = np.pad(ms_totint, (0, pad_length), mode="constant")
+
     # Reshape the padded array
-    return np.reshape(padded_ms_totint, (nb_pix_2nd_d, -1), order='F')
+    return np.reshape(padded_ms_totint, (nb_pix_2nd_d, -1), order="F")
 
 
 def aggregate_unique_ms_data(mz_values, intensities):
@@ -406,7 +408,7 @@ def align_2d_chrom_ms_v5(
         )
 
         # Update pixel counts
-        if (ht+1) % nb_pix_2nd_d != 0:
+        if (ht + 1) % nb_pix_2nd_d != 0:
             scnd_d_flag += 1
         else:
             frst_d_flag += 1
@@ -429,18 +431,28 @@ def align_2d_chrom_ms_v5(
 
         for ht in range(len(aligned_indices)):
             aligned_indices[ht], defm[ht] = compute_alignment(
-                ht, displacement, nb_pix_2nd_d, scnd_d_flag, frst_d_flag, deform_output, corner
+                ht,
+                displacement,
+                nb_pix_2nd_d,
+                scnd_d_flag,
+                frst_d_flag,
+                deform_output,
+                corner,
             )
 
             # Update pixel counts
-            if (ht+1) % nb_pix_2nd_d != 0:
+            if (ht + 1) % nb_pix_2nd_d != 0:
                 scnd_d_flag += 1
             else:
                 frst_d_flag += 1
                 scnd_d_flag = 0
 
         # Correct indices and handle out-of-bounds
-        aligned_indices = np.where((aligned_indices > np.max(ms_pixels_inds)) | (aligned_indices < 0), np.nan, aligned_indices)
+        aligned_indices = np.where(
+            (aligned_indices > np.max(ms_pixels_inds)) | (aligned_indices < 0),
+            np.nan,
+            aligned_indices,
+        )
 
         # Populate MS values and intensities
         lp_inds = np.arange(len(aligned_indices))
@@ -448,12 +460,24 @@ def align_2d_chrom_ms_v5(
 
         for ht in lp_inds2:
             msvaluebox_aligned[ht, :] = ms_valuebox[int(aligned_indices[ht]), :]
-            msintbox_aligned[ht, :] = ms_intbox[int(aligned_indices[ht]), :] * compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm)
-        
+            msintbox_aligned[ht, :] = ms_intbox[
+                int(aligned_indices[ht]), :
+            ] * compute_intensities_factor(
+                corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm
+            )
+
         msvaluebox_aligned[np.isnan(msvaluebox_aligned)] = 0
-        msintbox_aligned[np.isnan(msintbox_aligned)] = 0        
-    
-    del defms, aligned_inds, interp_distr, interp_dists, interp_distt, interp_distu, ms_pixels_inds
+        msintbox_aligned[np.isnan(msintbox_aligned)] = 0
+
+    del (
+        defms,
+        aligned_inds,
+        interp_distr,
+        interp_dists,
+        interp_distt,
+        interp_distu,
+        ms_pixels_inds,
+    )
     gc.collect()
 
     # Put the 4 corners interpolated values in the matrices
@@ -501,6 +525,7 @@ def align_2d_chrom_ms_v5(
         "Deform_output": deform_output,
     }
 
+
 def compute_alignment(
     ht, displacement, nb_pix_2nd_d, scnd_d_flag, frst_d_flag, deform_output, corner
 ):
@@ -531,7 +556,10 @@ def compute_alignment(
     )
     return aligned_index + ht, defm
 
-def compute_intensities_factor(corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm):
+
+def compute_intensities_factor(
+    corner, ht, interp_distr, interp_dists, interp_distt, interp_distu, defm
+):
     """
     Computes the intensity factor for a given corner (a, b, c, or d).
     """
@@ -598,8 +626,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
             # Compute the distance vector for the pixel
             distance_vec = np.array([w, x]) - np.flip(peaks_ref, axis=1)
             distance = np.sqrt(
-                distance_vec[:, 0] ** 2
-                + (distance_vec[:, 1] * peak_ratio) ** 2
+                distance_vec[:, 0] ** 2 + (distance_vec[:, 1] * peak_ratio) ** 2
             )
 
             # Compute the displacement using a weighted mean
@@ -650,12 +677,19 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     natw = peaks_ref_corner[:, 1]
     natx = peaks_ref_corner[:, 0] * peak_ratio
-    #TODO: fix ranges
+    # TODO: fix ranges
     wo = np.arange(-padding_w_lower, aligned.shape[0] + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower * peak_ratio), np.round((aligned.shape[1] + padding_x_upper) * peak_ratio))
+    xo = np.arange(
+        np.round(-padding_x_lower * peak_ratio),
+        np.round((aligned.shape[1] + padding_x_upper) * peak_ratio),
+    )
 
     fdist1 = natgrid(natw, natx, peaks_displacement_corner[:, 1], wo, xo)
-    fdist2 = natgrid(natw, natx, peaks_displacement_corner[:, 0], wo, xo) if model_choice == "DualSibson" else None
+    fdist2 = (
+        natgrid(natw, natx, peaks_displacement_corner[:, 0], wo, xo)
+        if model_choice == "DualSibson"
+        else None
+    )
 
     hep = np.vstack([peaks_ref[:, 0], peaks_displacement[:, 0]]).T
     hep1 = hep[:, 0]
@@ -692,10 +726,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
     pks, displ1d = peaks_ref[:, 0], peaks_displacement[:, 0]
     min_pks, max_pks = np.min(pks), np.max(pks)
     hum2 = interp1d(
-        [
-            min_pks,
-            max_pks
-        ],
+        [min_pks, max_pks],
         [
             np.mean(displ1d[pks == min_pks]),
             np.mean(displ1d[pks == max_pks]),
@@ -713,7 +744,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
             if model_choice == "normal":
                 displacement[w, x, :] = [
                     fdist1[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum[x] if min_x_pksref <= x <= max_x_pksref else hum2[x+1],
+                    hum[x] if min_x_pksref <= x <= max_x_pksref else hum2[x + 1],
                 ]
             else:
                 displacement[w, x, :] = [
@@ -736,26 +767,32 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
         mid_floor, mid_ceil = int(np.floor(th / 2)), int(np.ceil(th / 2))
 
         Z[:mid_floor, 1:] = target[mid_floor:, :-1]
-        Z[mid_floor:mid_floor + th, :] = target
-        Z[mid_floor + th:, :-1] = target[:mid_ceil, 1:]
+        Z[mid_floor : mid_floor + th, :] = target
+        Z[mid_floor + th :, :-1] = target[:mid_ceil, 1:]
 
         mid_idx = round(th / 2)
         Xq = X[mid_idx : mid_idx + th, :] + displacement[:, :, 1]
         Yq = Y[mid_idx : mid_idx + th, :] + displacement[:, :, 0]
-        
+
         # 2d interpolation
         points = (X[0, :], Y[:, 0])
         queries = np.column_stack((Xq.ravel(), Yq.ravel()))
-        
+
         method = "splinef2d" if method == "spline" else method
-        aligned = interpn(points, Z.T, queries, method=method, fill_value=0, bounds_error=False)
+        aligned = interpn(
+            points, Z.T, queries, method=method, fill_value=0, bounds_error=False
+        )
         aligned = aligned.reshape(target.shape)
         return aligned
 
-    aligned = apply_interpolation(ref, target, displacement, method=inter_pixel_interp_meth)
+    aligned = apply_interpolation(
+        ref, target, displacement, method=inter_pixel_interp_meth
+    )
 
     for k in range(len(peaks_displacement)):
-        displacement[int(peaks_ref[k, 1]), int(peaks_ref[k, 0]), :] = peaks_displacement[k, ::-1]
+        displacement[int(peaks_ref[k, 1]), int(peaks_ref[k, 0]), :] = (
+            peaks_displacement[k, ::-1]
+        )
 
     # Extend displacement with borders
     displacement_extended = np.zeros((aligned.shape[0] + 2, aligned.shape[1] + 2, 2))
@@ -763,14 +800,17 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     natw, natx = peaks_ref_corner[:, 1] + 1, (peaks_ref_corner[:, 0] + 1) * peak_ratio
     natv = peaks_displacement_corner[:, 1]
-    #TODO: fix ranges
+    # TODO: fix ranges
     wo = np.arange(-padding_w_lower, aligned.shape[0] + 2 + padding_w_upper)
-    xo = np.arange(np.round(-padding_x_lower * peak_ratio), np.round((aligned.shape[1] + 2 + padding_x_upper) * peak_ratio))
+    xo = np.arange(
+        np.round(-padding_x_lower * peak_ratio),
+        np.round((aligned.shape[1] + 2 + padding_x_upper) * peak_ratio),
+    )
     fdist1bis = natgrid(natw, natx, natv, wo, xo)
 
     for w in [0, aligned.shape[0] + 1]:
         for x in range(aligned.shape[1] + 2):
-            if min_x_pksref <= x <= max_x_pksref:  #TODO: should we add a +1 for peaks?
+            if min_x_pksref <= x <= max_x_pksref:  # TODO: should we add a +1 for peaks?
                 displacement_extended[w, x, :] = [
                     fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
                     hum[x],
@@ -783,7 +823,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     for w in range(1, aligned.shape[0] + 1):
         for x in [0, aligned.shape[1] + 1]:
-            if min_x_pksref <= x <= max_x_pksref:  #TODO: should we add a +1 for peaks?
+            if min_x_pksref <= x <= max_x_pksref:  # TODO: should we add a +1 for peaks?
                 displacement_extended[w, x, :] = [
                     fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
                     hum[x],
@@ -814,8 +854,10 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     # Correct for negative deformations
     if np.any(deform1 < 0) or np.any(deform2 < 0):
-        print("Warning: Some displacement predictions lead to inversion of pixel order (as indicated by negative values in Deform_output, "
-            "here set to zero) please change your set of alignment points!")
+        print(
+            "Warning: Some displacement predictions lead to inversion of pixel order (as indicated by negative values in Deform_output, "
+            "here set to zero) please change your set of alignment points!"
+        )
         deform1[deform1 < 0] = 0
         deform2[deform2 < 0] = 0
 
@@ -859,7 +901,7 @@ def equalize_size(chromato1, chromato2):
 def save_chromatogram(filename, chromato_obj):
     """
     Save the chromatogram data to a NetCDF file.
-    
+
     Parameters:
         filename (str): Path to the output NetCDF file.
         chromato_obj (dict): Dictionary containing the chromatogram data.
@@ -906,10 +948,11 @@ def save_chromatogram(filename, chromato_obj):
         vardim_h[:] = chromato_obj["MSvalueboxLine"]
         vardim_i[:] = chromato_obj["MSintboxLine"]
 
+
 def run_chromatogram_alignment(config):
     """
     Main function to run the chromatogram alignment process.
-    
+
     Parameters:
         config (dict): Dictionary containing the configuration parameters.
     """
@@ -920,24 +963,26 @@ def run_chromatogram_alignment(config):
         target_file=config["io_params"]["TARGET_CHROMATOGRAM_FILE"],
         reference_file=config["io_params"]["REFERENCE_CHROMATOGRAM_FILE"],
         int_thresh=config["instrument_params"]["INTTHRESHOLD"],
-        drift_ms=config["instrument_params"]["DRIFTMS"]
+        drift_ms=config["instrument_params"]["DRIFTMS"],
     )
     print("Chromatograms loaded successfully.")
 
     print("Loading alignment points...")
     reference_peaks, target_peaks = load_alignment_points(
-        chromato_ref=chromato_ref,
-        chromato_target=chromato_target,
-        config=config
+        chromato_ref=chromato_ref, chromato_target=chromato_target, config=config
     )
-    #TODO: to remove
+    # TODO: to remove
     reference_peaks -= 1
     target_peaks -= 1
     print("Alignment points loaded successfully.")
-    
+
     # Compute the number of pixels in the 2nd dimension based on the modulation time and sampling rate
-    nb_pix_2nd_d_ref = int(config["instrument_params"]["MODTIME_REF"] * chromato_ref["SamRate"])
-    nb_pix_2nd_d_target = int(config["instrument_params"]["MODTIME_TARGET"] * chromato_target["SamRate"])
+    nb_pix_2nd_d_ref = int(
+        config["instrument_params"]["MODTIME_REF"] * chromato_ref["SamRate"]
+    )
+    nb_pix_2nd_d_target = int(
+        config["instrument_params"]["MODTIME_TARGET"] * chromato_target["SamRate"]
+    )
 
     print("Reshaping chromatogram data...")
     ref_tic = reshape_tic(chromato_ref["MStotint"], nb_pix_2nd_d_ref)
@@ -947,8 +992,12 @@ def run_chromatogram_alignment(config):
 
     print("Rounding MS data...")
     time_start = time.time()
-    chromato_target["MSvaluebox"], chromato_target["MSintbox"] = round_and_aggregate_unique_ms_data(
-        chromato_target["MSvaluebox"], chromato_target["MSintbox"], precision=config["instrument_params"]["PRECISION"]
+    chromato_target["MSvaluebox"], chromato_target["MSintbox"] = (
+        round_and_aggregate_unique_ms_data(
+            chromato_target["MSvaluebox"],
+            chromato_target["MSintbox"],
+            precision=config["instrument_params"]["PRECISION"],
+        )
     )
     time_end = time.time()
     print("MS data rounded successfully. Time taken:", time_end - time_start)
@@ -982,12 +1031,20 @@ def run_chromatogram_alignment(config):
 
     print("Saving aligned chromatogram...")
     output_file_name = os.path.join(
-        config["io_params"]["OUTPUT_PATH"], os.path.splitext(config["io_params"]["TARGET_CHROMATOGRAM_FILE"])[0] + "_ALIGNED.cdf"
+        config["io_params"]["OUTPUT_PATH"],
+        os.path.splitext(config["io_params"]["TARGET_CHROMATOGRAM_FILE"])[0]
+        + "_ALIGNED.cdf",
     )
     save_chromatogram(output_file_name, aligned_result)
     print("Aligned chromatogram saved successfully.")
 
+
 if __name__ == "__main__":
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "pbp_pixel_config.json")
+    config_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "config",
+        "pbp_pixel_config.json",
+    )
     config = load_config(config_path)
     run_chromatogram_alignment(config)
