@@ -18,9 +18,7 @@ from peak_detection import peak_detection
 from read_chroma import read_chromato_and_chromato_cube
 
 
-def swpa_peak_alignment(
-    input_dir, ref_filename, targets_subdir, mod_time=1.25, peak_detection_thr=5
-):
+def swpa_peak_alignment(input_dir, ref_filename, mod_time=1.25, peak_detection_thr=5):
     """
     Preprocess chromatograms and save them as CSV input files for SWPA script.
 
@@ -30,39 +28,60 @@ def swpa_peak_alignment(
         The directory path where the chromatogram files are located.
     ref_filename : str
         Name of the reference chromatogram file.
-    targets_subdir : str
-        The subdirectory where the target chromatograms are located.
     mod_time : float
         The modulation time of the chromatograms.
     peak_detection_thr : float
         The threshold for peak detection.
     """
 
+    all_files = glob.glob(os.path.join(input_dir, "*.cdf"))
+    ranges = get_mass_range_from_chromatos(all_files)
+
     ref_file = os.path.join(input_dir, ref_filename)
-    target_files = glob.glob(os.path.join(input_dir, targets_subdir, "*.cdf"))
-    ranges = get_mass_range_from_chromatos([ref_file] + target_files)
+    target_files = [
+        file for file in all_files if file != ref_file
+    ]  # remove ref chromatogram from targets
 
     with tempfile.TemporaryDirectory() as temp_dir:
         dict_chromatos = {}
 
         # First, convert the reference chromatogram to CSV
         convert_chromato_to_csv(
-            ref_file, temp_dir, ranges, dict_chromatos=dict_chromatos, mod_time=mod_time, peak_detection_thr=peak_detection_thr
+            ref_file,
+            temp_dir,
+            ranges,
+            dict_chromatos=dict_chromatos,
+            mod_time=mod_time,
+            peak_detection_thr=peak_detection_thr,
         )
         print("Converted reference chromatogram to CSV")
 
         # Next, convert the target chromatograms to CSV
         for i, file in enumerate(target_files):
             convert_chromato_to_csv(
-                file, temp_dir, ranges, dict_chromatos=dict_chromatos, mod_time=mod_time, peak_detection_thr=peak_detection_thr
+                file,
+                temp_dir,
+                ranges,
+                dict_chromatos=dict_chromatos,
+                mod_time=mod_time,
+                peak_detection_thr=peak_detection_thr,
             )
             print(f"Converted {i + 1}/{len(target_files)} chromatograms to CSV")
-        
-        matches = run_swpa_script(temp_dir, ref_filename, dict_chromatos, mod_time=mod_time)
-        return matches
-        
 
-def convert_chromato_to_csv(chromato_path, output_dir, ranges, dict_chromatos=None, mod_time=1.25, peak_detection_thr=5):
+        matches = run_swpa_script(
+            temp_dir, ref_filename, dict_chromatos, mod_time=mod_time
+        )
+        return matches
+
+
+def convert_chromato_to_csv(
+    chromato_path,
+    output_dir,
+    ranges,
+    dict_chromatos=None,
+    mod_time=1.25,
+    peak_detection_thr=5,
+):
     """
     Convert a chromatogram file to a CSV file.
 
@@ -156,7 +175,7 @@ def run_swpa_script(csv_path, ref_filename, dict_chromatos, mod_time=1.25):
     # prepare arguments
     ref = os.path.join(csv_path, f"{ref_filename.split('.')[0]}.csv")
     targets = glob.glob(os.path.join(csv_path, "*.csv"))
-    targets.pop(targets.index(ref)) # remove ref chromatogram from targets
+    targets.pop(targets.index(ref))  # remove ref chromatogram from targets
 
     # create directory for output files using date and time as name
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -249,7 +268,7 @@ def load_and_merge_csvs(output_csv_dir, ref_filename, dict_chromatos, mod_time=1
 
     # Concatenate all the DataFrames into one big DataFrame
     merged_df = pd.concat(df_list, ignore_index=True)
-    
+
     # Sort the DataFrame by descending combined score of similarity and distance
     sim_norm = (merged_df["sim"] - merged_df["sim"].min()) / (
         merged_df["sim"].max() - merged_df["sim"].min()
