@@ -11,7 +11,6 @@ from ngl import natgrid
 from swpa_peak_alignment import swpa_peak_alignment
 
 # ---------------------------------------------------------------------
-# TODO: use arrays with float32 if precision is not needed
 # TODO: maybe structure all the code in separate files
 # ---------------------------------------------------------------------
 
@@ -46,15 +45,15 @@ def open_chromatogram(filename, int_thresh, drift_ms):
     with Dataset(filename, "r") as cdf:
         # Retrieve data from the file
         flag = cdf.variables["flag_count"][:]
-        scan_time = cdf.variables["scan_acquisition_time"][:]
+        scan_time = cdf.variables["scan_acquisition_time"][:].astype(np.float32)
         scan_num = cdf.variables["actual_scan_number"][:]
-        med_ms_max = cdf.variables["mass_range_max"][:]
-        med_ms_min = cdf.variables["mass_range_min"][:]
+        med_ms_max = cdf.variables["mass_range_max"][:].astype(np.float32)
+        med_ms_min = cdf.variables["mass_range_min"][:].astype(np.float32)
         ion_id = cdf.variables["scan_index"][:]
         each_scan_num = cdf.variables["point_count"][:]
-        ms_tot_int = cdf.variables["total_intensity"][:]
-        ms_value = cdf.variables["mass_values"][:] + drift_ms
-        ms_int = cdf.variables["intensity_values"][:]
+        ms_tot_int = cdf.variables["total_intensity"][:].astype(np.float32)
+        ms_value = (cdf.variables["mass_values"][:] + drift_ms).astype(np.float32)
+        ms_int = cdf.variables["intensity_values"][:].astype(np.float32)
 
     # Compute Time parameters
     time_para = scan_time[np.abs(each_scan_num) < np.iinfo(np.int32).max]
@@ -65,26 +64,25 @@ def open_chromatogram(filename, int_thresh, drift_ms):
     # Initialize data arrays
     pixel_num = len(scan_num)
     max_scan_num = np.max(each_scan_num)
-    ms_data_box = np.zeros((pixel_num, max_scan_num + 1))
     ms_value_box = np.zeros((pixel_num, max_scan_num + 1))
     ms_int_box = np.zeros((pixel_num, max_scan_num + 1))
 
     # Populate MS data boxes
-    for i_num in range(pixel_num):
-        if abs(each_scan_num[i_num]) < np.iinfo(np.int32).max:
-            initial = np.sum(each_scan_num[: i_num + 1]) - each_scan_num[i_num]
-            acq_range = (
-                np.arange(
-                    min(initial, initial + each_scan_num[i_num] - 1),
-                    max(initial, initial + each_scan_num[i_num] - 1) + 1,
-                )
-                if each_scan_num[i_num] != 0
-                else []
-            )
+    initials = np.cumsum(each_scan_num) - each_scan_num
+    acq_ranges = [
+        np.arange(
+            min(initials[i], initials[i] + each_scan_num[i] - 1),
+            max(initials[i], initials[i] + each_scan_num[i] - 1) + 1,
+        )
+        if each_scan_num[i] != 0
+        else []
+        for i in range(pixel_num)
+    ]
 
-            remain_rep = np.zeros(max_scan_num - each_scan_num[i_num] + 1)
-            ms_value_box[i_num, :] = np.concatenate([ms_value[acq_range], remain_rep])
-            ms_int_box[i_num, :] = np.concatenate([ms_int[acq_range], remain_rep])
+    for i_num in range(pixel_num):
+        acq_range = acq_ranges[i_num]
+        ms_value_box[i_num, : len(acq_range)] = ms_value[acq_range]
+        ms_int_box[i_num, : len(acq_range)] = ms_int[acq_range]
 
     # Apply intensity threshold
     ms_value_box[ms_int_box < int_thresh] = 0
@@ -109,7 +107,6 @@ def open_chromatogram(filename, int_thresh, drift_ms):
         "pixelnum": pixel_num,
         "maxscannum": max_scan_num,
         "minscannum": np.min(each_scan_num),
-        "MSdatabox": ms_data_box,
         "MSvaluebox": ms_value_box,
         "MSintbox": ms_int_box,
         "ionid": ion_id,
@@ -380,19 +377,57 @@ def align_2d_chrom_ms_v5(
         inter_pixel_interp_meth=inter_pixel_interp_meth,
     )
 
-    ms_pixels_inds = np.arange(ms_valuebox.shape[0])
-    aligned_inds = [np.zeros_like(ms_pixels_inds) for _ in range(4)]
-    aligned_msvaluebox = [np.zeros_like(ms_valuebox) for _ in range(4)]
-    aligned_msintbox = [np.zeros_like(ms_intbox) for _ in range(4)]
-    interp_distr = np.zeros_like(ms_pixels_inds, dtype=float)
-    interp_dists = np.zeros_like(ms_pixels_inds, dtype=float)
-    interp_distt = np.zeros_like(ms_pixels_inds, dtype=float)
-    interp_distu = np.zeros_like(ms_pixels_inds, dtype=float)
-    defms = [np.zeros_like(ms_pixels_inds, dtype=float) for _ in range(4)]
+    aligned_msvaluebox_i, aligned_msintbox_i = bilinear_interpolation_alignment(
+        ms_valuebox, ms_intbox, displacement, deform_output, nb_pix_2nd_d
+    )
+
+    aligned_msvaluebox_ii, aligned_msintbox_ii = sort_and_trim_nonzero_columns(
+        aligned_msvaluebox_i, aligned_msintbox_i
+    )
+    del aligned_msvaluebox_i, aligned_msintbox_i
+    gc.collect()
+
+    # -- Step 3: For each pixel, only keep each m/z value once, summing corresponding intensity values
+    # Initialize matrices for aggregated m/z values and intensities
+    final_mz_values, final_intensities = aggregate_unique_ms_data(
+        aligned_msvaluebox_ii, aligned_msintbox_ii
+    )
+    del aligned_msvaluebox_ii, aligned_msintbox_ii
+    gc.collect()
+
+    aligned_each_scan_num = np.full(
+        (final_intensities.shape[0], 1), final_intensities.shape[1]
+    )
+    aligned_medion_id = np.cumsum(aligned_each_scan_num)
+
+    return {
+        "MSvaluebox": final_mz_values,
+        "MSintbox": final_intensities,
+        "eachscannum": aligned_each_scan_num,
+        "ionid": aligned_medion_id,
+        "Aligned": aligned,
+        "Displacement": displacement,
+        "Deform_output": deform_output,
+    }
+
+
+def bilinear_interpolation_alignment(
+    ms_valuebox, ms_intbox, displacement, deform_output, nb_pix_2nd_d
+):
+    vb_rows, vb_cols = ms_valuebox.shape
+    ib_rows, ib_cols = ms_intbox.shape
+    aligned_indices = np.zeros(vb_rows, dtype=np.float32)
+    aligned_msvaluebox = np.zeros((vb_rows, vb_cols * 4))
+    aligned_msintbox = np.zeros((ib_rows, ib_cols * 4))
+    interp_distr = np.zeros(vb_rows, dtype=np.float32)
+    interp_dists = np.zeros(vb_rows, dtype=np.float32)
+    interp_distt = np.zeros(vb_rows, dtype=np.float32)
+    interp_distu = np.zeros(vb_rows, dtype=np.float32)
+    defm = np.zeros(vb_rows, dtype=np.float32)
 
     # -------------------------
     frst_d_flag, scnd_d_flag = 0, 0
-    for ht in range(len(aligned_inds[0])):
+    for ht in range(vb_rows):
         # Compute r, s, t, u for interpolation
         interp_distr[ht] = displacement[scnd_d_flag, frst_d_flag, 1] - np.floor(
             displacement[scnd_d_flag, frst_d_flag, 1]
@@ -424,12 +459,16 @@ def align_2d_chrom_ms_v5(
     # Process for each corner (a, b, c, d)
     for corner in range(4):
         frst_d_flag, scnd_d_flag = 0, 0
-        aligned_indices = aligned_inds[corner]
-        msvaluebox_aligned = aligned_msvaluebox[corner]
-        msintbox_aligned = aligned_msintbox[corner]
-        defm = defms[corner]
+        aligned_indices.fill(0)
+        defm.fill(0)
+        msvaluebox_aligned = aligned_msvaluebox[
+            :, vb_cols * corner : vb_cols * (corner + 1)
+        ]
+        msintbox_aligned = aligned_msintbox[
+            :, ib_cols * corner : ib_cols * (corner + 1)
+        ]
 
-        for ht in range(len(aligned_indices)):
+        for ht in range(vb_rows):
             aligned_indices[ht], defm[ht] = compute_alignment(
                 ht,
                 displacement,
@@ -449,7 +488,7 @@ def align_2d_chrom_ms_v5(
 
         # Correct indices and handle out-of-bounds
         aligned_indices = np.where(
-            (aligned_indices > np.max(ms_pixels_inds)) | (aligned_indices < 0),
+            (aligned_indices > np.max(vb_rows - 1)) | (aligned_indices < 0),
             np.nan,
             aligned_indices,
         )
@@ -469,21 +508,14 @@ def align_2d_chrom_ms_v5(
         msvaluebox_aligned[np.isnan(msvaluebox_aligned)] = 0
         msintbox_aligned[np.isnan(msintbox_aligned)] = 0
 
-    del (
-        defms,
-        aligned_inds,
-        interp_distr,
-        interp_dists,
-        interp_distt,
-        interp_distu,
-        ms_pixels_inds,
-    )
-    gc.collect()
+    return aligned_msvaluebox, aligned_msintbox
 
-    # Put the 4 corners interpolated values in the matrices
-    aligned_msvaluebox_i = np.concatenate(aligned_msvaluebox, axis=1)
-    aligned_msintbox_i = np.concatenate(aligned_msintbox, axis=1)
 
+def sort_and_trim_nonzero_columns(aligned_msvaluebox_i, aligned_msintbox_i):
+    """
+    Sorts the columns of the aligned MS value and intensity matrices in ascending order of m/z values.
+    Removes trailing zeros from the matrices.
+    """
     # Remove zeros temporarily by replacing them with the maximum integer value
     aligned_msvaluebox_i[aligned_msvaluebox_i == 0] = np.iinfo(np.int32).max
 
@@ -504,26 +536,7 @@ def align_2d_chrom_ms_v5(
     aligned_msvaluebox_ii = aligned_msvaluebox_i[:, :max_not_zero]
     aligned_msintbox_ii = aligned_msintbox_i[:, :max_not_zero]
 
-    # -- Step 3: For each pixel, only keep each m/z value once, summing corresponding intensity values
-    # Initialize matrices for aggregated m/z values and intensities
-    final_mz_values, final_intensities = aggregate_unique_ms_data(
-        aligned_msvaluebox_ii, aligned_msintbox_ii
-    )
-
-    aligned_each_scan_num = np.full(
-        (final_intensities.shape[0], 1), final_intensities.shape[1]
-    )
-    aligned_medion_id = np.cumsum(aligned_each_scan_num)
-
-    return {
-        "MSvaluebox": final_mz_values,
-        "MSintbox": final_intensities,
-        "eachscannum": aligned_each_scan_num,
-        "ionid": aligned_medion_id,
-        "Aligned": aligned,
-        "Displacement": displacement,
-        "Deform_output": deform_output,
-    }
+    return aligned_msvaluebox_ii, aligned_msintbox_ii
 
 
 def compute_alignment(
@@ -609,7 +622,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     # Initialize output arrays
     aligned = np.zeros_like(target)
-    displacement = np.zeros((target.shape[0], target.shape[1], 2))
+    displacement = np.zeros((target.shape[0], target.shape[1], 2), dtype=np.float32)
 
     # -- Compute displacement of peaks and interpolate (1st dim: linear, 2nd dim: natural-neighbor)
     displacement2 = np.zeros((2, 2, 2))
@@ -986,6 +999,7 @@ def run_chromatogram_alignment(config):
     target_tic = reshape_tic(chromato_target["MStotint"], nb_pix_2nd_d_target)
     print("Chromatogram data reshaped successfully.")
     del chromato_ref
+    gc.collect()
 
     print("Rounding MS data...")
     time_start = time.time()
