@@ -3,6 +3,7 @@ import time
 import warnings
 import gc
 
+from concurrent.futures import ProcessPoolExecutor
 import json
 import numpy as np
 from netCDF4 import Dataset
@@ -1053,7 +1054,7 @@ def run_chromatogram_alignment(config):
 def combine_swpa_pbp_alignment(config, num_points=10, align_all_targets=False):
     """
     Combine the SWPA and PBP alignment methods.
-    
+
     Parameters:
         config (dict): Dictionary containing the configuration parameters.
         num_points (int): Number of alignment points to use.
@@ -1063,14 +1064,23 @@ def combine_swpa_pbp_alignment(config, num_points=10, align_all_targets=False):
     ref_filename = config["io_params"]["REFERENCE_CHROMATOGRAM_FILE"]
 
     # -- Run SWPA peak alignment
-    matches = swpa_peak_alignment(input_dir, ref_filename, mod_time=config["instrument_params"]["MODTIME"])
+    with ProcessPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            swpa_peak_alignment,
+            input_dir,
+            ref_filename,
+            mod_time=config["instrument_params"]["MODTIME"],
+        )
+        matches = future.result()
 
     # -- Run PBP alignment
     if align_all_targets:
-        target_files = [f for f in os.listdir(input_dir) if f.endswith(".cdf") and f != ref_filename]
+        target_files = [
+            f for f in os.listdir(input_dir) if f.endswith(".cdf") and f != ref_filename
+        ]
     else:
         target_files = [config["io_params"]["TARGET_CHROMATOGRAM_FILE"]]
-    
+
     def coordinates_to_csv(matches, num_points, output_dir, config):
         """
         Save the alignment points to a CSV file.
@@ -1082,18 +1092,23 @@ def combine_swpa_pbp_alignment(config, num_points=10, align_all_targets=False):
             config (dict): Dictionary containing the configuration parameters.
         """
         output_file_ref = os.path.join(
-            output_dir, config["io_params"]["REFERENCE_ALIGNMENT_PTS_FILE"],
+            output_dir,
+            config["io_params"]["REFERENCE_ALIGNMENT_PTS_FILE"],
         )
         output_file_target = os.path.join(
-            output_dir, config["io_params"]["TARGET_ALIGNMENT_PTS_FILE"],
+            output_dir,
+            config["io_params"]["TARGET_ALIGNMENT_PTS_FILE"],
         )
-        coordinates = matches[matches["filename"] == os.path.splitext(config["io_params"]["TARGET_CHROMATOGRAM_FILE"])[0]]
-    
+        coordinates = matches[
+            matches["filename"]
+            == os.path.splitext(config["io_params"]["TARGET_CHROMATOGRAM_FILE"])[0]
+        ]
+
         # Ensure num_points does not exceed the number of available rows
         num_points = min(num_points, len(coordinates))
 
         coordinates = coordinates.head(num_points)
-    
+
         units = config["model_choice_params"]["UNITS"]
         if units == "pixel":
             ref_coord = coordinates[["rp1", "rp2"]]
@@ -1101,26 +1116,24 @@ def combine_swpa_pbp_alignment(config, num_points=10, align_all_targets=False):
         else:
             ref_coord = coordinates[["rt1", "rt2"]]
             target_coord = coordinates[["tt1", "tt2"]]
-    
+
         ref_coord.to_csv(output_file_ref, index=False, header=False)
         target_coord.to_csv(output_file_target, index=False, header=False)
 
     for target_file in target_files:
         config["io_params"]["TARGET_CHROMATOGRAM_FILE"] = target_file
-        coordinates_to_csv(matches, num_points=num_points, output_dir=input_dir, config=config)
+        coordinates_to_csv(
+            matches, num_points=num_points, output_dir=input_dir, config=config
+        )
         run_chromatogram_alignment(config)
 
 
 if __name__ == "__main__":
-    # config_path = os.path.join(
-    #     os.path.dirname(os.path.abspath(__file__)),
-    #     "..",
-    #     "config",
-    #     "pbp_pixel_config.json",
-    # )
-    # config = load_config(config_path)
-    # run_chromatogram_alignment(config)
-    
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config", "combination_swpa_pbp_config.json")
+    config_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "config",
+        "pbp_pixel_config.json",
+    )
     config = load_config(config_path)
-    combine_swpa_pbp_alignment(config)
+    run_chromatogram_alignment(config)

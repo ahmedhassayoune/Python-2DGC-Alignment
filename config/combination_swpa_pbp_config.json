@@ -2,7 +2,7 @@
   "instrument_params": {
     "PRECISION": 2,
     "INTTHRESHOLD": 0,
-    "MODTIME": 1.7,
+    "MODTIME": 1.25,
     "DRIFTMS": 0
   },
   "model_choice_params": {
