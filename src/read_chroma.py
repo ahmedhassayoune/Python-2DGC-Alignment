@@ -83,7 +83,8 @@ def read_chroma(filename, mod_time = 1.25, max_val = None):
     """
     ds = nc.Dataset(filename)
     chromato = ds['total_intensity']
-    sam_rate = 1 / ds['scan_duration'][0]
+    Timepara = ds["scan_acquisition_time"][np.abs(ds["point_count"]) < np.iinfo(np.int32).max]
+    sam_rate = 1 / np.mean(Timepara[1:] - Timepara[:-1])
     l1 = math.floor(sam_rate * mod_time)
     l2 = math.floor(len(chromato) / l1)
 
@@ -94,8 +95,8 @@ def read_chroma(filename, mod_time = 1.25, max_val = None):
         mv = ds["mass_values"][:]
         iv = ds["intensity_values"][:]
 
-    range_min = math.ceil(ds["mass_range_min"][0])
-    range_max = math.floor(ds["mass_range_max"][1])
+    range_min = math.ceil(ds["mass_range_min"][:].min())
+    range_max = math.floor(ds["mass_range_max"][:].max())
 
     chromato = np.reshape(chromato[:l1*l2], (l2,l1))
     return chromato, (ds['scan_acquisition_time'][0] / 60, ds['scan_acquisition_time'][-1] / 60), (l1, l2, mv, iv, range_min, range_max)
@@ -129,7 +130,7 @@ def read_chromato_cube(filename, mod_time=1.25, pre_process=True):
     start_time=time.time()
     chromato_obj = read_chroma(filename, mod_time)
     chromato,time_rn,spectra_obj = chromato_obj
-    print("chromato readed", time.time()-start_time)
+    print("chromato read", time.time()-start_time)
     start_time=time.time()
     full_spectra = mass_spec.read_full_spectra_centroid(spectra_obj=spectra_obj)
     print("full spectra computed", time.time()-start_time)
@@ -179,7 +180,7 @@ def read_chromato_and_chromato_cube(filename, mod_time=1.25, pre_process=True):
     chromato_obj = read_chroma(filename, mod_time)
     chromato,time_rn,spectra_obj = chromato_obj
     (l1, l2, mv, iv, range_min, range_max) = spectra_obj
-    print("chromato readed", time.time()-start_time, 's')
+    print("chromato read", time.time()-start_time, 's')
     start_time=time.time()
     full_spectra = mass_spec.read_full_spectra_centroid(spectra_obj=spectra_obj)
     print("full spectra computed", time.time()-start_time, 's')
