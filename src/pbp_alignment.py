@@ -1,14 +1,15 @@
+import gc
+import json
 import os
 import time
 import warnings
-import gc
-
 from concurrent.futures import ProcessPoolExecutor
-import json
+
 import numpy as np
 from netCDF4 import Dataset
-from scipy.interpolate import interpn, interp1d
 from ngl import natgrid
+from scipy.interpolate import interp1d, interpn
+
 from swpa_peak_alignment import swpa_peak_alignment
 
 # ---------------------------------------------------------------------
