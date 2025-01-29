@@ -1029,12 +1029,12 @@ def run_chromatogram_alignment(config):
     aligned_result["MStotint"] = aligned_ms_tot_int
     
     # Flatten the MSvaluebox and MSintbox arrays and remove zeros
-    ms_valuebox = aligned_result["MSvaluebox"]
-    ms_intbox = aligned_result["MSintbox"]
+    ms_valuebox = aligned_result["MSvaluebox"].ravel()
+    ms_intbox = aligned_result["MSintbox"].ravel()
     mask = ms_valuebox != 0
 
-    aligned_result["MSvaluebox"] = ms_valuebox.ravel()[mask]
-    aligned_result["MSintbox"] = ms_intbox.ravel()[mask]
+    aligned_result["MSvaluebox"] = ms_valuebox[mask]
+    aligned_result["MSintbox"] = ms_intbox[mask]
 
     print("Saving aligned chromatogram...")
     output_file_name = os.path.join(
