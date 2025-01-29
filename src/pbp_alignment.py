@@ -12,10 +12,6 @@ from scipy.interpolate import interp1d, interpn
 
 from swpa_peak_alignment import swpa_peak_alignment
 
-# ---------------------------------------------------------------------
-# TODO: maybe structure all the code in separate files
-# ---------------------------------------------------------------------
-
 
 def load_config(config_path):
     """
@@ -692,7 +688,6 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     natw = peaks_ref_corner[:, 1]
     natx = peaks_ref_corner[:, 0] * peak_ratio
-    # TODO: fix ranges
     wo = np.arange(-padding_w_lower, aligned.shape[0] + padding_w_upper)
     xo = np.arange(
         np.round(-padding_x_lower * peak_ratio),
@@ -815,7 +810,6 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     natw, natx = peaks_ref_corner[:, 1] + 1, (peaks_ref_corner[:, 0] + 1) * peak_ratio
     natv = peaks_displacement_corner[:, 1]
-    # TODO: fix ranges
     wo = np.arange(-padding_w_lower, aligned.shape[0] + 2 + padding_w_upper)
     xo = np.arange(
         np.round(-padding_x_lower * peak_ratio),
@@ -825,7 +819,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     for w in [0, aligned.shape[0] + 1]:
         for x in range(aligned.shape[1] + 2):
-            if min_x_pksref <= x <= max_x_pksref:  # TODO: should we add a +1 for peaks?
+            if min_x_pksref <= x <= max_x_pksref:
                 displacement_extended[w, x, :] = [
                     fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
                     hum[x],
@@ -838,7 +832,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
 
     for w in range(1, aligned.shape[0] + 1):
         for x in [0, aligned.shape[1] + 1]:
-            if min_x_pksref <= x <= max_x_pksref:  # TODO: should we add a +1 for peaks?
+            if min_x_pksref <= x <= max_x_pksref:
                 displacement_extended[w, x, :] = [
                     fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
                     hum[x],
@@ -921,14 +915,6 @@ def save_chromatogram(filename, chromato_obj):
         filename (str): Path to the output NetCDF file.
         chromato_obj (dict): Dictionary containing the chromatogram data.
     """
-    # Flatten the MSvaluebox and MSintbox arrays and remove zeros
-    ms_valuebox_line = chromato_obj["MSvaluebox"].T
-    ms_intbox_line = chromato_obj["MSintbox"].T
-    ms_valuebox_line = ms_valuebox_line.flatten()
-    ms_intbox_line = ms_intbox_line.flatten()
-    chromato_obj["MSvalueboxLine"] = ms_valuebox_line[ms_valuebox_line != 0]
-    chromato_obj["MSintboxLine"] = ms_intbox_line[ms_valuebox_line != 0]
-
     # Create a new NetCDF file with 64-bit offset
     with Dataset(filename, "w", format="NETCDF4") as ncnew:
         # Define dimensions
@@ -936,7 +922,7 @@ def save_chromatogram(filename, chromato_obj):
             "scan_number", len(chromato_obj["scantime"])
         )
         point_number = ncnew.createDimension(
-            "point_number", len(chromato_obj["MSintboxLine"])
+            "point_number", len(chromato_obj["MSintbox"])
         )
 
         # Define variables
@@ -960,8 +946,8 @@ def save_chromatogram(filename, chromato_obj):
         vardim_e[:] = chromato_obj["ionid"]
         vardim_f[:] = chromato_obj["eachscannum"]
         vardim_g[:] = chromato_obj["MStotint"]
-        vardim_h[:] = chromato_obj["MSvalueboxLine"]
-        vardim_i[:] = chromato_obj["MSintboxLine"]
+        vardim_h[:] = chromato_obj["MSvaluebox"]
+        vardim_i[:] = chromato_obj["MSintbox"]
 
 
 def run_chromatogram_alignment(config):
@@ -1041,6 +1027,14 @@ def run_chromatogram_alignment(config):
     aligned_result["eachscannum"] = aligned_each_scan_num
     aligned_result["ionid"] = aligned_ion_id
     aligned_result["MStotint"] = aligned_ms_tot_int
+    
+    # Flatten the MSvaluebox and MSintbox arrays and remove zeros
+    ms_valuebox = aligned_result["MSvaluebox"]
+    ms_intbox = aligned_result["MSintbox"]
+    mask = ms_valuebox != 0
+
+    aligned_result["MSvaluebox"] = ms_valuebox.ravel()[mask]
+    aligned_result["MSintbox"] = ms_intbox.ravel()[mask]
 
     print("Saving aligned chromatogram...")
     output_file_name = os.path.join(
