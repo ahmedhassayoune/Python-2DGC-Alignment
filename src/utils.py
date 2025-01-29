@@ -26,13 +26,15 @@ def get_casno_dict(matches):
             casnos[casno] = [match[0]]
     return casnos
 
-def get_name_dict(matches):
+def get_name_dict(matches, in_rt=True):
     r"""Group coordinates in matches by compound name
 
     Parameters
     ----------
     matches :
         Retrieved peaks NIST infomartions.
+    in_rt : optional
+        If True, return coordinates in retention time, else return coordinates in pixels
     ----------
     Returns
     ----------
@@ -49,10 +51,11 @@ def get_name_dict(matches):
     names = dict()
     for match in matches:
         name = match[1]['compound_name']
+        point = match[0] if in_rt else match[2]
         if (names.get(name)):
-            names[name].append(match[0])
+            names[name].append(point)
         else:
-            names[name] = [match[0]]
+            names[name] = [point]
     return names
 
 def get_casno_list(matches):

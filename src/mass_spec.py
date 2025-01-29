@@ -138,30 +138,32 @@ def read_full_spectra_centroid(spectra_obj, max_val = None):
     (l1, l2, mv, iv, range_min, range_max) = spectra_obj
     minima = argrelextrema(mv, np.less)[0]
     fins = minima - 1
-    fins = np.append(fins, len(mv - 1))
+    fins = np.append(fins, len(mv)-1)
     debuts = np.insert(minima, 0, 0)
     #Stack 1-D arrays as columns into a 2-D array.
-    mass_spectra_ind = np.column_stack((debuts,fins))
-    spectra = []
-    for beg,end in mass_spectra_ind:
-
-        mass_values = (mv[beg:end])
-        int_values = (iv[beg:end])
-        spectra.append((mass_values,int_values))
+    mass_spectra_ind = np.column_stack((debuts, fins))
+    spectra = [(mv[beg:end], iv[beg:end]) for beg, end in mass_spectra_ind]
     spectra_full_nom = []
 
     '''for i in range(len(spectra)):
         spectra_full_nom.append(centroid_to_full_nominal(spectra_obj, spectra[i][0], spectra[i][1]))'''
     cpu_count = multiprocessing.cpu_count()
     mv = np.linspace(range_min, range_max, range_max - range_min + 1).astype(int)
-    with multiprocessing.Pool(processes = cpu_count) as pool:
-        #for i, result in enumerate(pool.starmap(centroid_to_full_nominal, [(spectra_obj, spectra[i][0], spectra[i][1]) for i in range(len(spectra))])):
-        for i, result in enumerate(pool.starmap(centroid_to_full_nominal, [((range_min, range_max), spectra[i][0], spectra[i][1]) for i in range(len(spectra))])):
-            spectra_full_nom.append((mv, result))
+    with multiprocessing.Pool(processes=cpu_count) as pool:
+        results = pool.starmap(centroid_to_full_nominal, 
+                            [((range_min, range_max), spectra[i][0], spectra[i][1]) for i in range(len(spectra))])
+    spectra_full_nom = [(mv, result) for result in results]
+    
+    # Pad with zeros to have necessary length of spectra
+    required_length = l1 * l2
+    if len(spectra_full_nom) < required_length:
+        spectra_full_nom.extend([(mv, np.zeros_like(mv))] * (required_length - len(spectra_full_nom)))
 
+    
     print("--- %s seconds --- to compute full spectra centroid" % (time.time() - start_time))
 
-    return np.array(spectra_full_nom), debuts, fins
+    spectra_full_nom = np.array(spectra_full_nom)
+    return spectra_full_nom, debuts, fins
 
 def centroid_to_full_nominal(spectra_obj, mass_values, int_values):
     #(l1, l2, mv, iv, range_min, range_max) = spectra_obj

@@ -53,7 +53,8 @@ def read_only_chroma(filename, mod_time = 1.25):
     """
     ds = nc.Dataset(filename)
     chromato = ds['total_intensity']
-    sam_rate = 1 / ds['scan_duration'][0]
+    Timepara = ds["scan_acquisition_time"][np.abs(ds["point_count"]) < np.iinfo(np.int32).max]
+    sam_rate = 1 / np.mean(Timepara[1:] - Timepara[:-1])
     l1 = math.floor(sam_rate * mod_time)
     l2 = math.floor(len(chromato) / l1)
     chromato = np.reshape(chromato[:l1*l2], (l2,l1))

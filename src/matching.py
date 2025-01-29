@@ -103,7 +103,7 @@ def matching_nist_lib_from_chromato_cube(chromato_obj, chromato_cube, coordinate
         del res
     print("nb match:")
     print(len(coordinates))
-    return np.array(match)
+    return match
 
 
 def matching_nist_lib(chromato_obj, spectra, coordinates, mod_time = 1.25):

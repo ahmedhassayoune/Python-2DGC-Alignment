@@ -573,7 +573,7 @@ def plm(chromato_obj, mod_time, seuil,  min_distance=1, mode="tic", chromato_cub
     else:
         return None'''
         
-def peak_detection(chromato_obj, spectra, chromato_cube, seuil, ABS_THRESHOLDS, method = "persistent_homology", mode='tic', cluster=True, min_distance=1, sigma_ratio=1.6, num_sigma=10, unique=True):
+def peak_detection(chromato_obj, spectra, chromato_cube, seuil, ABS_THRESHOLDS, mod_time=1.25, method = "persistent_homology", mode='tic', cluster=True, min_distance=1, sigma_ratio=1.6, num_sigma=10, unique=True):
     r"""Detect peaks in a 2D or 3D chromatogram.
 
     Parameters
@@ -586,6 +586,8 @@ def peak_detection(chromato_obj, spectra, chromato_cube, seuil, ABS_THRESHOLDS, 
         Threshold to filter peaks. A float between 0 and 1. A peak is returned if its intensity in chromato is greater than the maximum value in the chromatogram multiply by seuil.
     ABS_THRESHOLDS: optional
         If mode='mass_per_mass' or mode='3D', ABS_THRESHOLDS is the threshold relative to a slice of the 3D chromatogram or a slice of the 3D chromatogram.
+    mod_time: optional
+        The modulation time of the chromatogram.
     method: optional
         The method to use. The default method is "persistent_homology" but it can be "peak_local_max", "LoG", "DoG", or "DoH".
     cluster: optional
@@ -620,19 +622,19 @@ def peak_detection(chromato_obj, spectra, chromato_cube, seuil, ABS_THRESHOLDS, 
     radius = None
     if (method == "peak_local_max"):
         coordinates = plm(chromato_obj=(
-                    chromato, time_rn), mod_time=1.25, seuil=seuil, min_distance=min_distance, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
+                    chromato, time_rn), mod_time=mod_time, seuil=seuil, min_distance=min_distance, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
     elif(method=="LoG"):
         coordinates, radius = DoG(chromato_obj=(
-                    chromato, time_rn), mod_time=1.25, seuil=seuil, sigma_ratio=sigma_ratio, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
+                    chromato, time_rn), mod_time=mod_time, seuil=seuil, sigma_ratio=sigma_ratio, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
     elif(method=="DoG"):
         coordinates, radius = LoG(chromato_obj=(
-                    chromato, time_rn), mod_time=1.25, seuil=seuil, num_sigma=num_sigma, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
+                    chromato, time_rn), mod_time=mod_time, seuil=seuil, num_sigma=num_sigma, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
     elif(method=="DoH"):
         coordinates, radius = DoH(chromato_obj=(
-                    chromato, time_rn), mod_time=1.25, seuil=seuil, num_sigma=num_sigma, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
+                    chromato, time_rn), mod_time=mod_time, seuil=seuil, num_sigma=num_sigma, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
     elif(method=="persistent_homology"):
         coordinates = pers_hom(chromato_obj=(
-                chromato, time_rn), mod_time=1.25, seuil=seuil, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
+                chromato, time_rn), mod_time=mod_time, seuil=seuil, mode=mode, chromato_cube=chromato_cube, cluster=cluster, threshold_abs=ABS_THRESHOLDS, unique=unique)
     else:
         print("Unknown method")
         return None
