@@ -915,6 +915,12 @@ def save_chromatogram(filename, chromato_obj):
         filename (str): Path to the output NetCDF file.
         chromato_obj (dict): Dictionary containing the chromatogram data.
     """
+    # Add a timestamp to the filename if it already exists
+    if os.path.exists(filename):
+        filename, file_extension = os.path.splitext(filename)
+        timestamp = time.strftime("_%Y%m%d_%H%M%S")
+        filename = filename + timestamp + file_extension
+    
     # Create a new NetCDF file with 64-bit offset
     with Dataset(filename, "w", format="NETCDF4") as ncnew:
         # Define dimensions
