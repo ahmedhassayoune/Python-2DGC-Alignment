@@ -915,6 +915,13 @@ def save_chromatogram(filename, chromato_obj):
         filename (str): Path to the output NetCDF file.
         chromato_obj (dict): Dictionary containing the chromatogram data.
     """
+    # Get the directory path from the filename
+    directory = os.path.dirname(filename)
+    
+    # Create the directory if it doesn't exist
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+    
     # Add a timestamp to the filename if it already exists
     if os.path.exists(filename):
         filename, file_extension = os.path.splitext(filename)
