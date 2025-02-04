@@ -244,7 +244,7 @@ def load_alignment_points(chromato_ref, chromato_target, config):
         )
         config["model_choice_params"]["TYPICAL_PEAK_WIDTH"] = typical_peak_width[0]
 
-    return reference_peaks, target_peaks
+    return reference_peaks.astype(int), target_peaks.astype(int)
 
 
 def reshape_tic(ms_totint, nb_pix_2nd_d):
@@ -652,7 +652,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
                 np.flip(peaks_displacement, axis=1) * (weight[:, np.newaxis]), axis=0
             ) / np.sum(weight)
 
-    # Add a peak at each corner (around the chromatogram with an offset)
+    # Augment the peaks with corner points to improve interpolation near edges.
     peaks_ref_corner = np.vstack(
         [
             peaks_ref,
@@ -686,6 +686,7 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
         ]
     )
 
+    # Use Sibson interpolation (natgrid) for smooth interpolation for the 2nd dimension.
     natw = peaks_ref_corner[:, 1]
     natx = peaks_ref_corner[:, 0] * peak_ratio
     wo = np.arange(-padding_w_lower, aligned.shape[0] + padding_w_upper)
@@ -700,39 +701,43 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
         if model_choice == "DualSibson"
         else None
     )
+    
+    def update_displacements(peaks_ref, peaks_displacement):
+        """
+        Update displacement values based on the reference peaks.
 
-    hep = np.vstack([peaks_ref[:, 0], peaks_displacement[:, 0]]).T
-    hep1 = hep[:, 0]
-    hep2 = hep[:, 1]
-    herp = []
+        Args:
+        - peaks_ref (np.ndarray): Array of reference peaks with shape (n, 2), where each row represents [x, w].
+        - peaks_displacement (np.ndarray): Array of displacement values with shape (n, 2), where each row represents [displacement_x, displacement_w].
 
-    for hh in range(len(hep)):
-        herp.append([hep1[hh], np.mean(hep2[hep1 == hep1[hh]])])
+        Returns:
+        - np.ndarray: Updated `peaks_displacement` array with the new displacement values.
+        """
+        ref_peaks = peaks_ref[:, 0]
+        displacements = peaks_displacement[:, 0]
 
-    herp = np.array(herp)
+        # For each unique reference peak, average the displacement values
+        # to prevent inconsistencies in interpolation
+        unique_peaks = np.unique(ref_peaks)
+        averaged_displacements = np.array([
+            np.mean(displacements[ref_peaks == peak]) for peak in unique_peaks
+        ])
 
-    hap = []
-    k = 0
-    puet = 1
+        peak_displacement_mapping = np.vstack([unique_peaks, averaged_displacements]).T
+        for peak, displacement in peak_displacement_mapping:
+            mask = ref_peaks == peak
+            peaks_displacement[mask, 0] = displacement
 
-    for kui in range(len(herp)):
-        for zui in range(len(hap)):
-            if herp[kui, 0] == hap[zui][0]:
-                puet = 0
-                peaks_displacement[herp[:, 0] == hap[zui][0], 0] = herp[zui, 1]
-        if puet:
-            hap.append(herp[kui])
-            k += 1
-        else:
-            puet = 1
-    hap = np.array(hap)
+        return peaks_displacement, peak_displacement_mapping
+    
+    peaks_displacement, hap = update_displacements(peaks_ref, peaks_displacement)
 
     # Linear interpolation inside the convex hull
     hum = interp1d(hap[:, 0], hap[:, 1], kind="linear", fill_value="extrapolate")(
         np.arange(target.shape[1])
     )
 
-    # Linear extrapolation for outside the convex hull
+    # Use linear extrapolation outside the convex hull to ensure continuity.
     pks, displ1d = peaks_ref[:, 0], peaks_displacement[:, 0]
     min_pks, max_pks = np.min(pks), np.max(pks)
     hum2 = interp1d(
@@ -764,6 +769,21 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
     del fdist1, fdist2
 
     def apply_interpolation(ref, target, displacement, method="linear"):
+        """
+        Applies interpolation to realign the chromatogram.
+        The function constructs an extended target grid to allow for interpolation near edges.
+        It applies the computed displacement to get new pixel locations.
+        Finally, it interpolates the new values using interpn to realign the chromatogram.
+        
+        Parameters:
+            ref (numpy.ndarray): Reference chromatogram.
+            target (numpy.ndarray): Target chromatogram.
+            displacement (numpy.ndarray): Displacement matrix.
+            method (str): Interpolation method.
+        
+        Returns:
+            numpy.ndarray: Aligned chromatogram.
+        """
         # Prepare grid for interpolation
         rh, rw = ref.shape
         th, tw = target.shape
@@ -799,14 +819,11 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
         ref, target, displacement, method=inter_pixel_interp_meth
     )
 
-    for k in range(len(peaks_displacement)):
-        displacement[int(peaks_ref[k, 1]), int(peaks_ref[k, 0]), :] = (
-            peaks_displacement[k, ::-1]
-        )
-
-    # Extend displacement with borders
-    displacement_extended = np.zeros((aligned.shape[0] + 2, aligned.shape[1] + 2, 2))
-    displacement_extended[1:-1, 1:-1, :] = displacement
+    # -- Extension with Borders: Add padding and interpolate displacement at image boundaries.
+    displacement[peaks_ref[:, 1], peaks_ref[:, 0], :] = peaks_displacement[:, ::-1]
+    displacement_extended = np.pad(
+        displacement, pad_width=((1, 1), (1, 1), (0, 0)), mode="constant"
+    )
 
     natw, natx = peaks_ref_corner[:, 1] + 1, (peaks_ref_corner[:, 0] + 1) * peak_ratio
     natv = peaks_displacement_corner[:, 1]
@@ -817,33 +834,27 @@ def align_chromato(ref, target, peaks_ref, peaks_target, model_choice, **kwargs)
     )
     fdist1bis = natgrid(natw, natx, natv, wo, xo)
 
-    for w in [0, aligned.shape[0] + 1]:
+    for w in (0, aligned.shape[0] + 1):
         for x in range(aligned.shape[1] + 2):
-            if min_x_pksref <= x <= max_x_pksref:
-                displacement_extended[w, x, :] = [
-                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum[x],
-                ]
-            else:
-                displacement_extended[w, x, :] = [
-                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum2[x],
-                ]
+            displacement_extended[w, x, :] = [
+                fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                hum[x] if min_x_pksref <= x <= max_x_pksref else hum2[x],
+            ]
 
     for w in range(1, aligned.shape[0] + 1):
-        for x in [0, aligned.shape[1] + 1]:
-            if min_x_pksref <= x <= max_x_pksref:
-                displacement_extended[w, x, :] = [
-                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum[x],
-                ]
-            else:
-                displacement_extended[w, x, :] = [
-                    fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
-                    hum2[x],
-                ]
+        for x in (0, aligned.shape[1] + 1):
+            displacement_extended[w, x, :] = [
+                fdist1bis[int(w - wo[0]), int(x * peak_ratio - xo[0])],
+                hum[x] if min_x_pksref <= x <= max_x_pksref else hum2[x],
+            ]
     del fdist1bis, hum, hum2
     gc.collect()
+
+    # -- Compute deformation correction
+    #   -> Preserves relative pixel intensities: Adjusts for compression/expansion in displacement.
+    #   Compression: Pixels are pushed together, leading to intensity overestimation due to overlap.
+    #   Expansion: Pixels are spread apart, causing intensity underestimation as the image is "diluted"
+    #   over a larger area.
 
     # Initialize deformation arrays
     deform1 = np.zeros_like(aligned)
@@ -907,7 +918,7 @@ def equalize_size(chromato1, chromato2):
     return chromato1_eq, chromato2_eq
 
 
-def save_chromatogram(filename, chromato_obj):
+def save_chromatogram(filename, chromato_obj, replace_existing=False):
     """
     Save the chromatogram data to a NetCDF file.
 
@@ -917,17 +928,17 @@ def save_chromatogram(filename, chromato_obj):
     """
     # Get the directory path from the filename
     directory = os.path.dirname(filename)
-    
+
     # Create the directory if it doesn't exist
     if directory and not os.path.exists(directory):
         os.makedirs(directory)
-    
+
     # Add a timestamp to the filename if it already exists
-    if os.path.exists(filename):
+    if not replace_existing and os.path.exists(filename):
         filename, file_extension = os.path.splitext(filename)
         timestamp = time.strftime("_%Y%m%d_%H%M%S")
         filename = filename + timestamp + file_extension
-    
+
     # Create a new NetCDF file with 64-bit offset
     with Dataset(filename, "w", format="NETCDF4") as ncnew:
         # Define dimensions
@@ -1040,7 +1051,7 @@ def run_chromatogram_alignment(config):
     aligned_result["eachscannum"] = aligned_each_scan_num
     aligned_result["ionid"] = aligned_ion_id
     aligned_result["MStotint"] = aligned_ms_tot_int
-    
+
     # Flatten the MSvaluebox and MSintbox arrays and remove zeros
     ms_valuebox = aligned_result["MSvaluebox"].ravel()
     ms_intbox = aligned_result["MSintbox"].ravel()
